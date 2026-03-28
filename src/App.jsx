@@ -375,6 +375,9 @@ const App = () => {
   const [straightEdges, setStraightEdges] = useState(false);
   const [layoutKey, setLayoutKey] = useState(0); // increment to force re-layout
   const rfRef = useRef(null);
+  // Gallery state lives here so it persists when switching between views
+  const [galleryPosts, setGalleryPosts]     = useState([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
   // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
   const [toast, setToast] = useState(null);
   const [proModal, setProModal] = useState(null);   // { message }
@@ -554,6 +557,10 @@ const App = () => {
         // supaya tidak trigger fetchData dua kali saat login baru (onLoginSuccess sudah set ini)
         setCurrentFamily(prev => (prev?.id === fam.id ? prev : fam));
         setUserPlan(fam.plan || 'free');
+        // Load appConfig saved by admin (so all devices see same app name/logo)
+        if (fam.config && Object.keys(fam.config).length > 0) {
+          setAppConfig(prev => ({ ...prev, ...fam.config }));
+        }
       }
     } catch (_) {}
   }, [fetchUserRole]);
@@ -707,6 +714,69 @@ const App = () => {
 
   // Cache plan so it's available synchronously on next reload (prevents lock flash)
   useEffect(() => { localStorage.setItem('_cachedPlan', userPlan); }, [userPlan]);
+
+  // ── Sync appConfig to Supabase (admin only) so members see latest app name ──
+  const appConfigSaveTimer = useRef(null);
+  useEffect(() => {
+    if (!supabase || !user) return; // only admin has Supabase auth
+    clearTimeout(appConfigSaveTimer.current);
+    appConfigSaveTimer.current = setTimeout(() => {
+      const fid = currentFamily?.id;
+      if (fid) supabase.from('families').update({ config: appConfig }).eq('id', fid);
+    }, 1200); // debounce 1.2s
+  }, [appConfig, user]);
+
+  // ── Families realtime: auto-update plan + config for all users ──
+  useEffect(() => {
+    if (!supabase || !currentFamily?.id) return;
+    const ch = supabase.channel(`fam:${currentFamily.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'families', filter: `id=eq.${currentFamily.id}` },
+        (payload) => {
+          const upd = payload.new;
+          if (!upd) return;
+          // Update plan for family members (admin already has latest)
+          if (upd.plan && upd.plan !== userPlan) {
+            setUserPlan(upd.plan);
+            if (familyUser) {
+              try {
+                const sess = JSON.parse(sessionStorage.getItem('famSession') || '{}');
+                sess.family = { ...(sess.family || {}), plan: upd.plan };
+                sessionStorage.setItem('famSession', JSON.stringify(sess));
+              } catch (_) {}
+            }
+          }
+          // Update appConfig for members (admin ignores — they're the source of truth)
+          if (!user && upd.config) {
+            setAppConfig(prev => ({ ...prev, ...upd.config }));
+          }
+          // Update family name
+          setCurrentFamily(prev => prev ? { ...prev, name: upd.name || prev.name } : prev);
+        })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [currentFamily?.id]);
+
+  // ── Gallery: load + realtime (state lives in App so it survives view switches) ──
+  const loadGallery = useCallback(async (fid) => {
+    if (!supabase || !fid) return;
+    setGalleryLoading(true);
+    const { data } = await supabase.from('gallery_posts').select('*').eq('family_id', fid).order('created_at', { ascending: false });
+    if (data) setGalleryPosts(data);
+    setGalleryLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (currentFamily?.id) loadGallery(currentFamily.id);
+  }, [currentFamily?.id, loadGallery]);
+
+  useEffect(() => {
+    if (!supabase || !currentFamily?.id) return;
+    const ch = supabase.channel(`gp:${currentFamily.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${currentFamily.id}` },
+        () => loadGallery(currentFamily.id))
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [currentFamily?.id, loadGallery]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -2218,6 +2288,8 @@ const App = () => {
             <GalleryView
               key="gallery"
               familyId={currentFamily?.id}
+              posts={galleryPosts}
+              loading={galleryLoading}
               currentUser={user ? { id: user.id, name: user.email?.split('@')[0], isAdmin: true } : familyUser ? { id: familyUser.id, name: familyUser.name, isAdmin: false } : null}
               canEdit={!!(user || familyUser)}
             />
@@ -2537,8 +2609,15 @@ const App = () => {
                </div>
             </motion.div>
           ) : (
-            <motion.div key="table" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} style={{ padding: '20px', maxWidth: '1100px', margin: '0 auto', width: '100%' }}>
-              
+            <motion.div key="table" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} style={{ padding: '20px', maxWidth: '1100px', margin: '0 auto', width: '100%', position: 'relative', minHeight: 200 }}>
+
+              {loading && (
+                <div style={{ position: 'absolute', inset: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, background: 'var(--bg-main)', opacity: 0.92 }}>
+                  <div style={{ width: 32, height: 32, border: '3px solid var(--border-card)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Memuat data anggota...</div>
+                </div>
+              )}
+
               <div className="table-action-row" style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                 <div className="search-container-wrapper" style={{ flex: 1, minWidth: '250px' }}>
                   <div style={{ position: 'relative', width: '100%' }}>

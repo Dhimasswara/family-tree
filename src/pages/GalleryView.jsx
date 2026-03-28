@@ -19,14 +19,19 @@ const Avatar = ({ name = '?', size = 36 }) => {
   );
 };
 
+const MAX_IMG = 1000; // max px on longest side
 const getCroppedImg = (imageSrc, pixelCrop) => new Promise((resolve, reject) => {
   const image = new window.Image();
   image.onload = () => {
+    let w = pixelCrop.width, h = pixelCrop.height;
+    if (w > MAX_IMG || h > MAX_IMG) {
+      const scale = Math.min(MAX_IMG / w, MAX_IMG / h);
+      w = Math.round(w * scale); h = Math.round(h * scale);
+    }
     const canvas = document.createElement('canvas');
-    canvas.width  = pixelCrop.width;
-    canvas.height = pixelCrop.height;
-    canvas.getContext('2d').drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
-    resolve(canvas.toDataURL('image/jpeg', 0.82));
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, w, h);
+    resolve(canvas.toDataURL('image/jpeg', 0.72));
   };
   image.onerror = reject;
   image.src = imageSrc;
@@ -268,10 +273,9 @@ const CommentThread = ({ comments = [], currentUser, canAdmin, onUpdate }) => {
 };
 
 // ── Main GalleryView ──
-// Self-contained: all Supabase operations happen here directly on gallery_posts table
-const GalleryView = ({ familyId, currentUser, canEdit }) => {
-  const [posts, setPosts]       = useState([]);
-  const [loading, setLoading]   = useState(true);
+// posts + loading come from App.jsx (persists across view switches)
+// Mutations (add/delete/like/comment) still go directly to Supabase here
+const GalleryView = ({ familyId, posts = [], loading = false, currentUser, canEdit }) => {
   const [showForm, setShowForm] = useState(false);
   const [text, setText]         = useState('');
   const [location, setLocation] = useState('');
@@ -279,38 +283,10 @@ const GalleryView = ({ familyId, currentUser, canEdit }) => {
   const [photo, setPhoto]       = useState(null);
   const [lightbox, setLightbox] = useState(null);
   const [saving, setSaving]     = useState(false);
+  const [errMsg, setErrMsg]     = useState(null);
   const fileRef = useRef();
 
   const userId = currentUser?.id || 'anon';
-
-  // ── Load posts ──
-  const loadPosts = useCallback(async () => {
-    if (!supabase || !familyId) { setLoading(false); return; }
-    const { data, error } = await supabase
-      .from('gallery_posts')
-      .select('*')
-      .eq('family_id', familyId)
-      .order('created_at', { ascending: false });
-    if (!error && data) setPosts(data);
-    setLoading(false);
-  }, [familyId]);
-
-  useEffect(() => { loadPosts(); }, [loadPosts]);
-
-  // ── Realtime subscription ──
-  useEffect(() => {
-    if (!supabase || !familyId) return;
-    const channel = supabase
-      .channel(`gallery_posts:${familyId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'gallery_posts',
-        filter: `family_id=eq.${familyId}`,
-      }, () => { loadPosts(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [familyId, loadPosts]);
 
   // ── File pick ──
   const handleFile = (e) => {
@@ -325,8 +301,9 @@ const GalleryView = ({ familyId, currentUser, canEdit }) => {
   // ── Submit post ──
   const handleSubmit = async () => {
     if (!text.trim() && !photo) return;
-    if (!supabase || !familyId) return;
+    if (!supabase || !familyId) { setErrMsg('Tidak terhubung ke database.'); return; }
     setSaving(true);
+    setErrMsg(null);
     const post = {
       id: `p${Date.now()}`,
       family_id: familyId,
@@ -339,21 +316,17 @@ const GalleryView = ({ familyId, currentUser, canEdit }) => {
       liked_by: [],
       comments: [],
     };
-    // Optimistic
-    setPosts(prev => [post, ...prev]);
     setText(''); setPhoto(null); setLocation(''); setShowForm(false);
-
     const { error } = await supabase.from('gallery_posts').insert(post);
     if (error) {
+      setErrMsg('Gagal memposting: ' + error.message);
       console.error('Gagal post:', error.message);
-      setPosts(prev => prev.filter(p => p.id !== post.id));
     }
     setSaving(false);
   };
 
   // ── Delete post ──
   const handleDelete = async (id) => {
-    setPosts(prev => prev.filter(p => p.id !== id));
     await supabase?.from('gallery_posts').delete().eq('id', id);
   };
 
@@ -365,14 +338,11 @@ const GalleryView = ({ familyId, currentUser, canEdit }) => {
     const newLikedBy = likedBy.includes(userId)
       ? likedBy.filter(x => x !== userId)
       : [...likedBy, userId];
-    // Optimistic
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, liked_by: newLikedBy } : p));
     await supabase?.from('gallery_posts').update({ liked_by: newLikedBy }).eq('id', id);
   };
 
   // ── Update comments ──
   const updateComments = async (postId, comments) => {
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments } : p));
     await supabase?.from('gallery_posts').update({ comments }).eq('id', postId);
   };
 
@@ -391,6 +361,17 @@ const GalleryView = ({ familyId, currentUser, canEdit }) => {
             onConfirm={(cropped) => { setPhoto(cropped); setRawSrc(null); }}
             onCancel={() => setRawSrc(null)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Error toast */}
+      <AnimatePresence>
+        {errMsg && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', color: '#b91c1c' }}>
+            <span style={{ flex: 1 }}>{errMsg}</span>
+            <button onClick={() => setErrMsg(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c', padding: 2 }}><X size={13}/></button>
+          </motion.div>
         )}
       </AnimatePresence>
 
