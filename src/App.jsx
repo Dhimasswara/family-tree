@@ -296,37 +296,7 @@ const FamilyLoginModal = ({ isOpen, onClose, onLoginSuccess, familyMembers }) =>
 };
 
 const App = () => {
-  const [familyMembers, setFamilyMembers] = useState(() => {
-    const saved = localStorage.getItem('familyData');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch(e) { console.error('Error parsing localStorage', e); }
-    }
-    
-    // Normalisasi data inisial
-    let normalized = initialData.map(m => ({
-      ...m,
-      spouses: m.spouses || [],
-      fatherId: m.parents?.find(p => p.type === 'blood' && initialData.find(f => f.id === p.id)?.gender === 'male')?.id || '',
-      motherId: m.parents?.find(p => p.type === 'blood' && initialData.find(f => f.id === p.id)?.gender === 'female')?.id || '',
-    }));
-
-    // Sinkronkan data pasangan 2 arah pada pertama kali load
-    normalized.forEach(m => {
-        m.spouses.forEach(s => {
-            const spouseRecord = normalized.find(n => n.id === s.id);
-            if (spouseRecord) {
-                if (!spouseRecord.spouses) spouseRecord.spouses = [];
-                if (!spouseRecord.spouses.find(x => x.id === m.id)) {
-                    spouseRecord.spouses.push({ id: m.id, type: s.type });
-                }
-            }
-        });
-    });
-
-    return normalized;
-  });
+  const [familyMembers, setFamilyMembers] = useState([]);
 
   const [view, setView] = useState('tree');
   const [tableTab, setTableTab] = useState('members'); // 'members', 'birthdays', 'anniversaries'
@@ -464,6 +434,24 @@ const App = () => {
     }
   };
 
+  // Restore family + role on session resume
+  const restoreSession = useCallback(async (u) => {
+    if (!u || !supabase) return;
+    fetchUserRole(u.id);
+    setUserRole('super_admin'); // optimistic — overridden by fetchUserRole if different
+    try {
+      const { data: fam } = await supabase
+        .from('families')
+        .select('*')
+        .eq('admin_id', u.id)
+        .single();
+      if (fam) {
+        setCurrentFamily(fam);
+        setUserPlan(fam.plan || 'free');
+      }
+    } catch (_) {}
+  }, [fetchUserRole]);
+
   // Monitor Auth State
   useEffect(() => {
     if (!supabase) return;
@@ -471,21 +459,22 @@ const App = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
       setUser(u);
-      if (u) fetchUserRole(u.id);
+      if (u) restoreSession(u);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) {
-        fetchUserRole(u.id);
+        restoreSession(u);
       } else {
         setUserRole(null);
+        setCurrentFamily(null);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [fetchUserRole]);
+  }, [restoreSession]);
 
   useEffect(() => {
     if (view === 'settings' && userRole === 'super_admin') {
@@ -545,8 +534,6 @@ const App = () => {
   }, [fetchData]);
 
   useEffect(() => {
-    localStorage.setItem('familyData', JSON.stringify(familyMembers));
-    
     // Auto-sync ke Supabase: HANYA jika User Login
     if (!loading && user) {
         if (isInitialLoad.current) {
@@ -588,7 +575,9 @@ const App = () => {
   }, [familyMembers, loading]);
 
   useEffect(() => {
-    localStorage.setItem('familyAppConfig', JSON.stringify(appConfig));
+    try {
+      localStorage.setItem('familyAppConfig', JSON.stringify(appConfig));
+    } catch (_) {} // Abaikan QuotaExceededError
   }, [appConfig]);
 
   useEffect(() => {
@@ -1780,7 +1769,6 @@ const App = () => {
           alert('Anda harus login untuk melakukan reset.');
           return;
       }
-      localStorage.setItem('familyData', '[]');
       localStorage.removeItem('familyAppConfig');
       
       // Hapus data di Supabase (hanya data keluarga ini)
