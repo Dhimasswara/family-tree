@@ -3,6 +3,7 @@ import {
   ReactFlow,
   Controls,
   Background,
+  Panel,
   useNodesState,
   useEdgesState,
   MarkerType,
@@ -367,6 +368,8 @@ const App = () => {
   const [pinBuffers, setPinBuffers] = useState({});
   const [globalPin, setGlobalPin] = useState('');
   const [showMapView, setShowMapView] = useState(false);
+  const [straightEdges, setStraightEdges] = useState(false);
+  const rfRef = useRef(null);
   // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
   const [toast, setToast] = useState(null);
   const [proModal, setProModal] = useState(null);   // { message }
@@ -388,6 +391,74 @@ const App = () => {
   }, []);
   const openProModal = useCallback((message) => setProModal({ message }), []);
   const openConfirm = useCallback((message, onConfirm) => setConfirmModal({ message, onConfirm }), []);
+
+  const handleDownloadTree = useCallback(async () => {
+    try {
+      rfRef.current?.fitView({ duration: 0 });
+      await new Promise(r => setTimeout(r, 400));
+
+      const flowEl = document.querySelector('.react-flow__viewport');
+      const wrapper = document.querySelector('.react-flow');
+      if (!wrapper) return;
+
+      showToast('Menyiapkan gambar...', 'info');
+
+      const { toPng } = await import('html-to-image');
+      const dataUrl = await toPng(wrapper, {
+        backgroundColor: theme === 'dark' ? '#141210' : '#f7f4ef',
+        pixelRatio: 1.5,
+        filter: (node) => {
+          if (node?.classList?.contains('react-flow__minimap')) return false;
+          if (node?.classList?.contains('react-flow__controls')) return false;
+          if (node?.classList?.contains('tree-panel-btn')) return false;
+          return true;
+        },
+      });
+
+      // Add info watermark via canvas
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const infoH = 60;
+        canvas.width  = img.width;
+        canvas.height = img.height + infoH;
+        const ctx = canvas.getContext('2d');
+
+        // Background info bar
+        ctx.fillStyle = theme === 'dark' ? '#1c1917' : '#fffdf7';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Tree image
+        ctx.drawImage(img, 0, 0);
+
+        // Info bar
+        ctx.fillStyle = theme === 'dark' ? '#1c1917' : '#fff8f0';
+        ctx.fillRect(0, img.height, canvas.width, infoH);
+        ctx.strokeStyle = theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, img.height); ctx.lineTo(canvas.width, img.height); ctx.stroke();
+
+        ctx.fillStyle = theme === 'dark' ? '#d97706' : '#b45309';
+        ctx.font = 'bold 14px Outfit, sans-serif';
+        ctx.fillText('🌳 ' + (appConfig.appName || 'FamTree'), 20, img.height + 22);
+
+        ctx.fillStyle = theme === 'dark' ? '#a8a29e' : '#78716c';
+        ctx.font = '12px Outfit, sans-serif';
+        const infoText = `${currentFamily?.name || 'Silsilah Keluarga'} · ${familyMembers.length} anggota · Diekspor ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+        ctx.fillText(infoText, 20, img.height + 44);
+
+        const link = document.createElement('a');
+        link.download = `silsilah-${(currentFamily?.name || 'keluarga').replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showToast('Gambar berhasil diunduh!');
+      };
+      img.src = dataUrl;
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal mengunduh gambar.', 'error');
+    }
+  }, [theme, appConfig.appName, currentFamily, familyMembers.length]);
 
   // Auto-navigate to app when auth resolves
   useEffect(() => {
@@ -1053,12 +1124,18 @@ const App = () => {
           }
 
           // Union -> Anak
+          const childNasab = getNasabLabel(m, sortedMembers);
           edges.push({
             id: `e-child-${m.id}`,
             source: actualUnionId,
             target: m.id,
             sourceHandle: 'bottom',
             targetHandle: 'top',
+            label: childNasab || undefined,
+            labelStyle: { fontSize: 8, fontFamily: 'Outfit, sans-serif', fontWeight: 600, fill: 'var(--edge-child)' },
+            labelBgStyle: { fill: 'var(--bg-card)', fillOpacity: 0.85 },
+            labelBgPadding: [3, 5],
+            labelBgBorderRadius: 4,
             style: { stroke: 'var(--edge-child)', strokeWidth: 1.5, strokeDasharray: '5,4', opacity: 0.7 },
           });
         }
@@ -1899,8 +1976,11 @@ const App = () => {
           <button className={`nav-pill ${view === 'tree' ? 'active' : ''}`} onClick={() => setView('tree')}>
             <Trees size={14} /> Pohon
           </button>
-          <button className="nav-pill" onClick={() => setShowMapView(true)}>
-            <MapPin size={14} /> Peta
+          <button className="nav-pill" onClick={() => {
+            if (!planConfig.features.maps) { openProModal('Fitur Peta tersedia di paket Starter ke atas.'); return; }
+            setShowMapView(true);
+          }}>
+            <MapPin size={14} /> Peta {!planConfig.features.maps && '🔒'}
           </button>
           <button className={`nav-pill ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>
             <TableIcon size={14} /> Tabel
@@ -2015,6 +2095,8 @@ const App = () => {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 nodeTypes={nodeTypes}
+                onInit={(inst) => { rfRef.current = inst; }}
+                defaultEdgeOptions={{ type: straightEdges ? 'smoothstep' : 'default' }}
                 onNodeClick={(_, node) => {
                   if (node.type === 'familyMember') {
                     setViewTarget(familyMembers.find(m => m.id === node.data.id) || node.data);
@@ -2024,6 +2106,24 @@ const App = () => {
               >
                 <Background color={theme === 'light' ? '#f1f5f9' : '#1e293b'} gap={25} />
                 <Controls />
+                <Panel position="top-right" style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: 8 }}>
+                  <button
+                    className="tree-panel-btn"
+                    title={straightEdges ? 'Garis Lengkung' : 'Rapihkan Garis'}
+                    onClick={() => { setStraightEdges(p => !p); setTimeout(() => rfRef.current?.fitView({ duration: 500 }), 50); }}
+                    style={{ background: straightEdges ? 'var(--primary)' : 'var(--bg-card)', color: straightEdges ? 'white' : 'var(--text-main)', border: '1px solid var(--border-card)', borderRadius: 9, padding: '7px 12px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', fontFamily: 'Outfit, sans-serif', whiteSpace: 'nowrap' }}
+                  >
+                    ↔ {straightEdges ? 'Lurus' : 'Rapihkan'}
+                  </button>
+                  <button
+                    className="tree-panel-btn"
+                    title="Download Pohon Silsilah"
+                    onClick={handleDownloadTree}
+                    style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-card)', borderRadius: 9, padding: '7px 12px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', fontFamily: 'Outfit, sans-serif', whiteSpace: 'nowrap' }}
+                  >
+                    ⬇ Unduh
+                  </button>
+                </Panel>
               </ReactFlow>
             </motion.div>
           ) : ((userRole === 'super_admin' || userRole === 'admin') && view === 'settings') ? (
