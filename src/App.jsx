@@ -726,7 +726,7 @@ const App = () => {
     }, 1200); // debounce 1.2s
   }, [appConfig, user]);
 
-  // ── Families realtime: auto-update plan + config for all users ──
+  // ── Families realtime: plan + config instantly pushed to all open sessions ──
   useEffect(() => {
     if (!supabase || !currentFamily?.id) return;
     const ch = supabase.channel(`fam:${currentFamily.id}`)
@@ -734,27 +734,26 @@ const App = () => {
         (payload) => {
           const upd = payload.new;
           if (!upd) return;
-          // Update plan for family members (admin already has latest)
-          if (upd.plan && upd.plan !== userPlan) {
-            setUserPlan(upd.plan);
-            if (familyUser) {
+          // Functional updater avoids stale-closure problem
+          setUserPlan(prev => {
+            if (upd.plan && upd.plan !== prev) {
+              localStorage.setItem('_cachedPlan', upd.plan);
               try {
                 const sess = JSON.parse(sessionStorage.getItem('famSession') || '{}');
-                sess.family = { ...(sess.family || {}), plan: upd.plan };
-                sessionStorage.setItem('famSession', JSON.stringify(sess));
+                if (sess.family) { sess.family.plan = upd.plan; sessionStorage.setItem('famSession', JSON.stringify(sess)); }
               } catch (_) {}
+              return upd.plan;
             }
-          }
-          // Update appConfig for members (admin ignores — they're the source of truth)
-          if (!user && upd.config) {
+            return prev;
+          });
+          if (!user && upd.config && Object.keys(upd.config).length > 0) {
             setAppConfig(prev => ({ ...prev, ...upd.config }));
           }
-          // Update family name
           setCurrentFamily(prev => prev ? { ...prev, name: upd.name || prev.name } : prev);
         })
       .subscribe();
     return () => supabase.removeChannel(ch);
-  }, [currentFamily?.id]);
+  }, [currentFamily?.id, user]);
 
   // ── Gallery: load + realtime (state lives in App so it survives view switches) ──
   const loadGallery = useCallback(async (fid) => {
@@ -772,11 +771,19 @@ const App = () => {
   useEffect(() => {
     if (!supabase || !currentFamily?.id) return;
     const ch = supabase.channel(`gp:${currentFamily.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${currentFamily.id}` },
-        () => loadGallery(currentFamily.id))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${currentFamily.id}` },
+        ({ new: row }) => setGalleryPosts(prev => {
+          // avoid duplicate if this is our own post echoed back
+          if (prev.some(p => p.id === row.id)) return prev;
+          return [row, ...prev];
+        }))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${currentFamily.id}` },
+        ({ new: row }) => setGalleryPosts(prev => prev.map(p => p.id === row.id ? row : p)))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${currentFamily.id}` },
+        ({ old: row }) => setGalleryPosts(prev => prev.filter(p => p.id !== row.id)))
       .subscribe();
     return () => supabase.removeChannel(ch);
-  }, [currentFamily?.id, loadGallery]);
+  }, [currentFamily?.id]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -2157,7 +2164,7 @@ const App = () => {
             <div className="navbar-user-chip">
               <div className="navbar-user-avatar"><User size={12} /></div>
               <span>{familyUser.name}</span>
-              <button className="navbar-icon-btn" onClick={() => { setFamilyUser(null); sessionStorage.removeItem('famSession'); }} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
+              <button className="navbar-icon-btn" onClick={() => { setFamilyUser(null); setCurrentFamily(null); sessionStorage.removeItem('famSession'); setAppPage('auth'); }} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
             </div>
           ) : !user && (
             <button className="navbar-icon-btn" style={{ color: 'var(--primary)' }} onClick={() => setShowFamilyLoginModal(true)} title="Masuk Keluarga">
