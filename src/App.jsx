@@ -29,6 +29,7 @@ import Cropper from 'react-easy-crop';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import MapView from './pages/MapView';
+import GalleryView from './pages/GalleryView';
 import { getPlanConfig, PLANS } from './config/plans';
 
 // Error Boundary sederhana untuk menangkap crash
@@ -370,6 +371,7 @@ const App = () => {
   const [showMapView, setShowMapView] = useState(false);
   const [straightEdges, setStraightEdges] = useState(false);
   const rfRef = useRef(null);
+  const [galleryPosts, setGalleryPosts] = useState([]);
   // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
   const [toast, setToast] = useState(null);
   const [proModal, setProModal] = useState(null);   // { message }
@@ -621,6 +623,20 @@ const App = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Load gallery dari Supabase (kolom JSON di families)
+  useEffect(() => {
+    if (!supabase || !currentFamily?.id) return;
+    supabase.from('families').select('gallery').eq('id', currentFamily.id).single()
+      .then(({ data }) => { if (data?.gallery) setGalleryPosts(data.gallery); });
+  }, [currentFamily?.id]);
+
+  const saveGallery = useCallback(async (posts) => {
+    setGalleryPosts(posts);
+    if (supabase && currentFamily?.id) {
+      await supabase.from('families').update({ gallery: posts }).eq('id', currentFamily.id);
+    }
+  }, [currentFamily?.id]);
 
   useEffect(() => {
     // Auto-sync ke Supabase: HANYA jika User Login
@@ -1324,6 +1340,13 @@ const App = () => {
     setEdges(layoutedEdges);
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
+  // Derived edges: saat mode lurus aktif, paksa semua edge ke tipe 'step' (sudut 90°)
+  const displayEdges = useMemo(() =>
+    straightEdges
+      ? edges.map(e => ({ ...e, type: 'step', animated: false }))
+      : edges,
+  [edges, straightEdges]);
+
   const handleEdit = useCallback((member) => {
     setEditingId(member.id);
     setEditModalTab('biodata');
@@ -1398,12 +1421,12 @@ const App = () => {
     // 3. Langsung save ke Supabase (tidak hanya mengandalkan useEffect)
     if (supabase && currentFamily?.id && user) {
       const toSave = { ...editBuffer };
-      supabase.from('family_members').upsert({
+      const upsertMain = {
         id: toSave.id,
         name: toSave.name,
         gender: toSave.gender,
         birth: toSave.birth || null,
-        death: toSave.death || null,
+        death: (toSave.isDeceased && toSave.death) ? toSave.death : null,
         photo: toSave.photo || '',
         father_id: toSave.fatherId || '',
         mother_id: toSave.motherId || '',
@@ -1414,8 +1437,29 @@ const App = () => {
         phone: toSave.phone || '',
         notes: toSave.notes || '',
         family_id: currentFamily.id,
-      }).then(({ error }) => {
+      };
+
+      // Kumpulkan partner yang perlu di-sync spouses-nya
+      const partnerUpdates = [];
+      updatedMembers?.forEach(m => {
+        if (m.id === toSave.id) return;
+        const prevM = familyMembers.find(x => x.id === m.id);
+        const prevSpouseIds = (prevM?.spouses || []).map(s => s.id).sort().join(',');
+        const newSpouseIds  = (m.spouses  || []).map(s => s.id).sort().join(',');
+        if (prevSpouseIds !== newSpouseIds) {
+          partnerUpdates.push({ id: m.id, spouses: m.spouses });
+        }
+      });
+
+      supabase.from('family_members').upsert(upsertMain).then(({ error }) => {
         if (error) console.error('Gagal simpan anggota:', error);
+      });
+
+      // Sync pasangan lain yang berubah (bidirectional)
+      partnerUpdates.forEach(({ id, spouses }) => {
+        supabase.from('family_members').update({ spouses }).eq('id', id).then(({ error }) => {
+          if (error) console.error('Gagal sync pasangan:', error);
+        });
       });
     }
 
@@ -1982,6 +2026,12 @@ const App = () => {
           }}>
             <MapPin size={14} /> Peta {!planConfig.features.maps && '🔒'}
           </button>
+          <button className="nav-pill" onClick={() => {
+            if (!planConfig.features.kinship) { openProModal('Fitur Galeri Cerita tersedia di paket Starter ke atas.'); return; }
+            setView('gallery');
+          }} style={view === 'gallery' ? { background: 'var(--primary)', color: 'white' } : {}}>
+            📸 Galeri {!planConfig.features.kinship && '🔒'}
+          </button>
           <button className={`nav-pill ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>
             <TableIcon size={14} /> Tabel
           </button>
@@ -2091,12 +2141,11 @@ const App = () => {
             <motion.div key="tree" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: '100%', height: '100%' }}>
               <ReactFlow
                 nodes={nodes}
-                edges={edges}
+                edges={displayEdges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 nodeTypes={nodeTypes}
                 onInit={(inst) => { rfRef.current = inst; }}
-                defaultEdgeOptions={{ type: straightEdges ? 'smoothstep' : 'default' }}
                 onNodeClick={(_, node) => {
                   if (node.type === 'familyMember') {
                     setViewTarget(familyMembers.find(m => m.id === node.data.id) || node.data);
@@ -2126,6 +2175,15 @@ const App = () => {
                 </Panel>
               </ReactFlow>
             </motion.div>
+          ) : view === 'gallery' ? (
+            <GalleryView
+              key="gallery"
+              posts={galleryPosts}
+              familyMembers={familyMembers}
+              currentUser={user ? { id: user.id, name: user.email?.split('@')[0], isAdmin: true } : familyUser ? { id: familyUser.id, name: familyUser.name, isAdmin: false } : null}
+              canEdit={!!(user || familyUser)}
+              onSave={saveGallery}
+            />
           ) : ((userRole === 'super_admin' || userRole === 'admin') && view === 'settings') ? (
             <motion.div key="settings" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
                <div className="glass" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
