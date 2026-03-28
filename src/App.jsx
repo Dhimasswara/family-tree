@@ -77,9 +77,22 @@ const getCroppedImg = async (imageSrc, pixelCrop) => {
   return canvas.toDataURL('image/jpeg', 0.8);
 };
 
+// Family Group Background Node
+const FamilyGroupNode = ({ style }) => (
+  <div style={{
+    width: style?.width,
+    height: style?.height,
+    borderRadius: 20,
+    background: 'rgba(217,119,6,0.04)',
+    border: '1.5px dashed rgba(217,119,6,0.2)',
+    pointerEvents: 'none',
+  }} />
+);
+
 const nodeTypes = {
   familyMember: FamilyMemberNode,
-  union: UnionNode
+  union: UnionNode,
+  familyGroup: FamilyGroupNode,
 };
 
 // Helper: hitung urutan kelahiran & info saudara
@@ -588,10 +601,10 @@ const App = () => {
     dagreGraph.setDefaultEdgeLabel(() => ({}));
     
     // Sesuaikan parameter tinggi Box dengan render asli untuk mencegah jarak yang terlalu ngangkang
-    const nodeWidth = 220;
-    const nodeHeight = 85;
+    const nodeWidth = 172;
+    const nodeHeight = 160;
 
-    const spacingX = nodeWidth + 60; // Standard Dagre nodesep: 60px
+    const spacingX = nodeWidth + 80; // Standard Dagre nodesep
     
     // Kalkulasi Jarak Darah (Bloodline Distance) dengan BFS untuk menentukan Tuan Rumah vs Pendatang (In-laws) sejati
     const bloodlineDist = {};
@@ -690,7 +703,7 @@ const App = () => {
         }
     });
 
-    dagreGraph.setGraph({ rankdir: 'TB', ranksep: 50, nodesep: 60 });
+    dagreGraph.setGraph({ rankdir: 'TB', ranksep: 90, nodesep: 50 });
 
     const getTotalSpouseCount = (id, visited = new Set()) => {
         if (visited.has(id)) return 0;
@@ -1146,9 +1159,60 @@ const App = () => {
       });
     });
 
+    // Set edge type smoothstep untuk semua edge agar terlihat lebih rapi
+    edges.forEach(e => {
+      if (!e.type) e.type = 'smoothstep';
+    });
+
     const finalNodes = [...nodes, ...unionNodes];
     const computedNodes = getLayoutedElementsLocal(finalNodes, edges);
-    return { layoutedNodes: computedNodes, layoutedEdges: edges };
+
+    // ── Family Group Background Nodes ──────────────────────────────────────
+    // Untuk setiap pasangan yang punya anak, buat background rect transparan
+    // yang mengelompokkan saudara kandung secara visual
+    const groupNodes = [];
+    const processedGroups = new Set();
+    const PAD = 24;
+
+    sortedMembers.forEach(m => {
+      if (!m.fatherId || !m.motherId) return;
+      const groupKey = [m.fatherId, m.motherId].sort().join('-');
+      if (processedGroups.has(groupKey)) return;
+      processedGroups.add(groupKey);
+
+      // Kumpulkan semua anak dari pasangan ini
+      const siblings = sortedMembers.filter(c =>
+        (c.fatherId === m.fatherId && c.motherId === m.motherId)
+      );
+      if (siblings.length < 2) return; // Group hanya jika ≥ 2 anak
+
+      // Cari posisi masing-masing anak dari computedNodes
+      const sibPositions = siblings
+        .map(c => computedNodes.find(n => n.id === c.id))
+        .filter(Boolean);
+
+      if (sibPositions.length < 2) return;
+
+      const xs = sibPositions.map(n => n.position.x);
+      const ys = sibPositions.map(n => n.position.y);
+      const minX = Math.min(...xs) - PAD;
+      const minY = Math.min(...ys) - PAD;
+      const maxX = Math.max(...xs) + 172 + PAD; // 172 = nodeWidth
+      const maxY = Math.max(...ys) + 160 + PAD; // 160 = nodeHeight
+
+      groupNodes.push({
+        id: `group-${groupKey}`,
+        type: 'familyGroup',
+        position: { x: minX, y: minY },
+        style: { width: maxX - minX, height: maxY - minY },
+        data: { fatherId: m.fatherId, motherId: m.motherId, count: siblings.length },
+        selectable: false,
+        draggable: false,
+        zIndex: -1,
+      });
+    });
+
+    return { layoutedNodes: [...groupNodes, ...computedNodes], layoutedEdges: edges };
   }, [familyMembers]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
