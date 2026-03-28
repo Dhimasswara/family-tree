@@ -19,7 +19,8 @@ import {
   Plus, Users, User, Table as TableIcon, Share2, Trees,
   Trash2, Edit2, Save, X, Camera, Heart, Baby, Sun, Moon, Search,
   Divide, Settings, Download, Upload, LogIn, LogOut, Lock, Unlock, ShieldCheck, UserCog,
-  MapPin, Briefcase, GraduationCap, Phone, FileText
+  MapPin, Briefcase, GraduationCap, Phone, FileText,
+  Key, Crown, Star, Shield, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
@@ -202,6 +203,82 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   );
 };
 
+// Komponen Family Member Login (PIN)
+const FamilyLoginModal = ({ isOpen, onClose, onLoginSuccess, familyMembers }) => {
+  const [selectedId, setSelectedId] = useState('');
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!selectedId) { setError('Pilih nama anggota keluarga.'); return; }
+    if (!pin) { setError('Masukkan PIN.'); return; }
+    setLoading(true);
+    setError('');
+    const member = familyMembers.find(m => m.id === selectedId);
+    if (!member) { setError('Anggota tidak ditemukan.'); setLoading(false); return; }
+    if (!member.pin || member.pin !== pin) { setError('PIN salah. Hubungi admin.'); setLoading(false); return; }
+    onLoginSuccess(member);
+    onClose();
+    setSelectedId('');
+    setPin('');
+    setLoading(false);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)', padding: '20px' }}>
+      <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass" style={{ width: '100%', maxWidth: '400px', padding: '32px', color: 'var(--text-main)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', color: 'white', width: '52px', height: '52px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 4px 14px rgba(217,119,6,0.35)' }}>
+            <Key size={24} />
+          </div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '4px' }}>Masuk sebagai Anggota</h2>
+          <p style={{ fontSize: '0.82rem', opacity: 0.6 }}>Pilih nama & masukkan PIN yang diberikan admin</p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="form-group">
+            <label className="form-label">Nama Anggota Keluarga</label>
+            <select
+              value={selectedId}
+              onChange={e => setSelectedId(e.target.value)}
+              className="fi"
+            >
+              <option value="">— Pilih nama kamu —</option>
+              {familyMembers.filter(m => m.pin).map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">PIN</label>
+            <input
+              type="password"
+              className="fi"
+              value={pin}
+              onChange={e => setPin(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              placeholder="Masukkan PIN kamu"
+              maxLength={20}
+            />
+          </div>
+          {error && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }}>{error}</p>}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+            <button onClick={handleLogin} disabled={loading} className="btn btn-primary" style={{ flex: 1, padding: '13px', justifyContent: 'center', fontSize: '0.95rem' }}>
+              {loading ? 'Masuk...' : <><Key size={16} /> Masuk</>}
+            </button>
+            <button onClick={() => { onClose(); setSelectedId(''); setPin(''); setError(''); }} className="btn glass" style={{ flex: 1, padding: '13px', justifyContent: 'center' }}>
+              Batal
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const App = () => {
   const [familyMembers, setFamilyMembers] = useState(() => {
     const saved = localStorage.getItem('familyData');
@@ -280,7 +357,9 @@ const App = () => {
       appName: 'Fam Tree',
       tagline: 'Manajemen Nasab Dinamis',
       logoMode: 'icon',
-      logoUrl: ''
+      logoUrl: '',
+      isPremium: false,
+      premiumCode: 'FAMTREE-PREMIUM',
     };
   });
   
@@ -294,6 +373,12 @@ const App = () => {
   const [allProfiles, setAllProfiles] = useState([]); // Untuk list user di Settings
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Family Member Login (PIN-based)
+  const [familyUser, setFamilyUser] = useState(null);
+  const [showFamilyLoginModal, setShowFamilyLoginModal] = useState(false);
+  // PIN edit buffer for settings
+  const [pinBuffers, setPinBuffers] = useState({});
 
   const fetchUserRole = useCallback(async (userId) => {
     if (!supabase) return;
@@ -954,8 +1039,8 @@ const App = () => {
             sourceHandle: 'bottom',
             targetHandle: 'top',
             animated: true,
-            style: { stroke: '#6366f1', strokeWidth: 2.5 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' }
+            style: { stroke: '#0284c7', strokeWidth: 2.5 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#0284c7' }
           });
         }
       } else if (m.fatherId || m.motherId) {
@@ -998,7 +1083,7 @@ const App = () => {
             sourceHandle: 'right-source',
             targetHandle: 'left-target',
             style: {
-              stroke: s.type === 'divorced' ? '#94a3b8' : '#facc15',
+              stroke: s.type === 'divorced' ? '#94a3b8' : '#d97706',
               strokeWidth: 3,
               strokeDasharray: s.type === 'divorced' ? '4,4' : '0'
             },
@@ -1690,6 +1775,24 @@ const App = () => {
             <Users size={18} /> <span className="btn-text">Kalkulator</span>
           </button>
           
+          {familyUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary-light)', padding: '5px 12px', borderRadius: '12px', border: '1px solid rgba(217,119,6,0.2)' }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', flexShrink: 0 }}>
+                <User size={14} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{familyUser.name}</div>
+                <div style={{ fontSize: '0.58rem', color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase' }}>Anggota Keluarga</div>
+              </div>
+              <button className="btn glass" onClick={() => setFamilyUser(null)} style={{ padding: '5px', minWidth: 'auto', border: 'none', background: 'transparent' }} title="Keluar">
+                <LogOut size={14} style={{ color: 'var(--danger)' }} />
+              </button>
+            </div>
+          ) : !user && (
+            <button className="btn glass" onClick={() => setShowFamilyLoginModal(true)} style={{ color: 'var(--primary)', borderColor: 'rgba(217,119,6,0.25)' }}>
+              <Key size={16} /> <span className="btn-text">Masuk Keluarga</span>
+            </button>
+          )}
           {user ? (
             <div className="user-badge" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '12px', marginLeft: '10px' }}>
                 <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
@@ -1792,7 +1895,109 @@ const App = () => {
                   </div>
 
                   <hr style={{ borderColor: 'var(--border-card)', margin: '20px 0' }} />
-                  
+
+                  {/* PIN Management */}
+                  <div className="glass" style={{ padding: '24px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                      <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Key size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '1rem' }}>Kelola Akses Login Keluarga</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Set PIN untuk tiap anggota agar bisa login</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {familyMembers.sort((a,b) => a.name.localeCompare(b.name)).map(m => (
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'var(--bg-main)', borderRadius: '10px', border: '1px solid var(--border-card)' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: m.gender === 'male' ? 'rgba(2,132,199,0.15)' : 'rgba(190,24,93,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: m.gender === 'male' ? '#0284c7' : '#be185d', flexShrink: 0 }}>
+                            <User size={15} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{m.pin ? '● PIN sudah di-set' : '○ Belum ada PIN'}</div>
+                          </div>
+                          <input
+                            type="password"
+                            placeholder="Set PIN baru..."
+                            value={pinBuffers[m.id] || ''}
+                            onChange={e => setPinBuffers(prev => ({ ...prev, [m.id]: e.target.value }))}
+                            className="fi"
+                            style={{ width: '140px', padding: '8px 12px', fontSize: '0.82rem' }}
+                            maxLength={20}
+                          />
+                          <button
+                            className="btn btn-primary"
+                            style={{ padding: '8px 14px', fontSize: '0.8rem', flexShrink: 0 }}
+                            onClick={async () => {
+                              if (!pinBuffers[m.id]) return;
+                              setFamilyMembers(prev => prev.map(fm => fm.id === m.id ? { ...fm, pin: pinBuffers[m.id] } : fm));
+                              setPinBuffers(prev => ({ ...prev, [m.id]: '' }));
+                              if (supabase) {
+                                await supabase.from('family_members').update({ pin: pinBuffers[m.id] }).eq('id', m.id);
+                              }
+                            }}
+                            disabled={!pinBuffers[m.id]}
+                          >
+                            <Key size={13} /> Simpan
+                          </button>
+                          {m.pin && (
+                            <button
+                              className="btn glass"
+                              style={{ padding: '8px', color: 'var(--danger)', flexShrink: 0 }}
+                              title="Hapus PIN"
+                              onClick={async () => {
+                                setFamilyMembers(prev => prev.map(fm => fm.id === m.id ? { ...fm, pin: '' } : fm));
+                                if (supabase) {
+                                  await supabase.from('family_members').update({ pin: '' }).eq('id', m.id);
+                                }
+                              }}
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Premium */}
+                  <div className="glass" style={{ padding: '24px', marginBottom: '20px', border: '1px solid rgba(217,119,6,0.2)', background: 'linear-gradient(135deg, rgba(217,119,6,0.04), rgba(180,83,9,0.04))' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                      <div style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', color: 'white', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(217,119,6,0.3)' }}>
+                        <Crown size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          Status Premium
+                          {appConfig.isPremium && <span style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', color: 'white', fontSize: '0.6rem', padding: '2px 8px', borderRadius: '20px', fontWeight: 700 }}>AKTIF</span>}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Akses semua fitur tanpa batasan</div>
+                      </div>
+                      <div style={{ marginLeft: 'auto' }}>
+                        <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
+                          <input type="checkbox" checked={appConfig.isPremium} onChange={e => setAppConfig(prev => ({ ...prev, isPremium: e.target.checked }))} style={{ display: 'none' }} />
+                          <div style={{ width: 44, height: 24, borderRadius: 12, background: appConfig.isPremium ? 'var(--primary)' : 'var(--border-card)', transition: '0.2s', position: 'relative', border: '1px solid rgba(0,0,0,0.1)' }}>
+                            <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: appConfig.isPremium ? 22 : 3, transition: '0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label"><Key size={12} /> Kode Premium (bagikan ke pengguna)</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          value={appConfig.premiumCode || ''}
+                          onChange={e => setAppConfig(prev => ({ ...prev, premiumCode: e.target.value }))}
+                          className="fi"
+                          placeholder="Contoh: FAMTREE-PREMIUM"
+                          style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                        />
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>Pengguna bisa input kode ini untuk unlock premium</div>
+                    </div>
+                  </div>
+
                   <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '20px', borderRadius: '12px' }}>
                       <h3 style={{ marginBottom: '10px', fontSize: '1.1rem', color: '#0ea5e9' }}>Import Data Keluarga (Excel .xlsx)</h3>
                       <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '15px' }}>
@@ -2138,10 +2343,17 @@ const App = () => {
         </AnimatePresence>
       </main>
 
-      <LoginModal 
-        isOpen={showLoginModal} 
-        onClose={() => setShowLoginModal(false)} 
-        onLoginSuccess={(user) => setUser(user)} 
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={(user) => setUser(user)}
+      />
+
+      <FamilyLoginModal
+        isOpen={showFamilyLoginModal}
+        onClose={() => setShowFamilyLoginModal(false)}
+        onLoginSuccess={(member) => setFamilyUser(member)}
+        familyMembers={familyMembers}
       />
 
       {/* Edit Overlay */}
