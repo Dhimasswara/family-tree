@@ -367,6 +367,10 @@ const App = () => {
   const [pinBuffers, setPinBuffers] = useState({});
   const [globalPin, setGlobalPin] = useState('');
   const [showMapView, setShowMapView] = useState(false);
+  // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
+  const [toast, setToast] = useState(null);
+  const [proModal, setProModal] = useState(null);   // { message }
+  const [confirmModal, setConfirmModal] = useState(null); // { message, onConfirm }
   // View modal (klik node di tree)
   const [viewTarget, setViewTarget] = useState(null);
   // Page routing: 'landing' | 'auth' | 'app'
@@ -377,6 +381,13 @@ const App = () => {
 
   const planConfig = getPlanConfig(userPlan);
   const canAddMember = familyMembers.length < planConfig.maxMembers;
+
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3200);
+  }, []);
+  const openProModal = useCallback((message) => setProModal({ message }), []);
+  const openConfirm = useCallback((message, onConfirm) => setConfirmModal({ message, onConfirm }), []);
 
   // Auto-navigate to app when auth resolves
   useEffect(() => {
@@ -1048,7 +1059,7 @@ const App = () => {
             target: m.id,
             sourceHandle: 'bottom',
             targetHandle: 'top',
-            style: { stroke: 'var(--edge-child)', strokeWidth: 2 },
+            style: { stroke: 'var(--edge-child)', strokeWidth: 1.5, strokeDasharray: '5,4', opacity: 0.7 },
           });
         }
       } else if (m.fatherId || m.motherId) {
@@ -1082,17 +1093,23 @@ const App = () => {
         const revEdgeId = `e-spouse-${femaleId}-${maleId}`;
         
         if (!edges.find(e => e.id === edgeId || e.id === revEdgeId)) {
+          const isDivorced = s.type === 'divorced';
           edges.push({
             id: edgeId,
             source: maleId,
             target: femaleId,
             sourceHandle: 'right-source',
             targetHandle: 'left-target',
+            label: isDivorced ? 'Cerai' : 'Menikah',
+            labelStyle: { fontSize: 9, fontFamily: 'Outfit, sans-serif', fontWeight: 600, fill: isDivorced ? 'var(--edge-divorced)' : 'var(--edge-spouse)' },
+            labelBgStyle: { fill: 'var(--bg-card)', fillOpacity: 0.85 },
+            labelBgPadding: [3, 5],
+            labelBgBorderRadius: 4,
             style: {
-              stroke: s.type === 'divorced' ? 'var(--edge-divorced)' : 'var(--edge-spouse)',
-              strokeWidth: s.type === 'divorced' ? 1.5 : 2.5,
-              strokeDasharray: s.type === 'divorced' ? '6,4' : '0',
-              opacity: s.type === 'divorced' ? 0.5 : 1,
+              stroke: isDivorced ? 'var(--edge-divorced)' : 'var(--edge-spouse)',
+              strokeWidth: isDivorced ? 1.5 : 2,
+              strokeDasharray: isDivorced ? '6,4' : '0',
+              opacity: isDivorced ? 0.5 : 0.9,
             },
           });
         }
@@ -1395,7 +1412,7 @@ const App = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (!user) { alert('Anda harus login untuk menghapus data.'); return; }
+    if (!user) { showToast('Anda harus login untuk menghapus data.', 'error'); return; }
     const idsToDelete = [...selectedIds];
     setFamilyMembers(prev => prev.filter(m => !selectedIds.has(m.id)));
     if (supabase) {
@@ -1408,23 +1425,22 @@ const App = () => {
 
   const confirmDelete = async () => {
     if (!user) {
-        alert('Anda harus login untuk menghapus data.');
+        showToast('Anda harus login untuk menghapus data.', 'error');
         return;
     }
     if (deleteTarget && deleteInput === deleteTarget.name) {
       setFamilyMembers(prev => prev.filter(p => p.id !== deleteTarget.id));
-      
-      // Sync ke Supabase
+
       const { error } = await supabase
         .from('family_members')
         .delete()
         .eq('id', deleteTarget.id);
-      
+
       if (error) console.error('Gagal hapus di Supabase:', error);
-      
+
       setDeleteTarget(null);
     } else {
-      alert('Nama tidak persis sama. Penghapusan dibatalkan.');
+      showToast('Nama tidak persis sama. Penghapusan dibatalkan.', 'error');
     }
   };
 
@@ -1807,7 +1823,7 @@ const App = () => {
 
   const confirmResetApp = async () => {
       if (!user) {
-          alert('Anda harus login untuk melakukan reset.');
+          showToast('Anda harus login untuk melakukan reset.', 'error');
           return;
       }
       localStorage.removeItem('familyAppConfig');
@@ -1883,6 +1899,9 @@ const App = () => {
           <button className={`nav-pill ${view === 'tree' ? 'active' : ''}`} onClick={() => setView('tree')}>
             <Trees size={14} /> Pohon
           </button>
+          <button className="nav-pill" onClick={() => setShowMapView(true)}>
+            <MapPin size={14} /> Peta
+          </button>
           <button className={`nav-pill ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>
             <TableIcon size={14} /> Tabel
           </button>
@@ -1894,13 +1913,10 @@ const App = () => {
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
           <button className="navbar-icon-btn" style={{ color: 'var(--primary)' }} onClick={() => {
-            if (!planConfig.features.kinship) { alert('Fitur Kalkulator Nasab tersedia di paket Starter ke atas.'); return; }
+            if (!planConfig.features.kinship) { openProModal('Fitur Kalkulator Nasab tersedia di paket Starter ke atas.'); return; }
             setShowKinshipModal(true);
           }} title="Kalkulator Nasab">
             <Divide size={16} />
-          </button>
-          <button className="navbar-icon-btn" onClick={() => setShowMapView(true)} title="Peta Persebaran">
-            <MapPin size={16} />
           </button>
 
           {familyUser ? (
@@ -2070,7 +2086,7 @@ const App = () => {
                           <button className="btn btn-primary" style={{ padding: '10px 14px', fontSize: '0.82rem', gap: 6 }}
                             onClick={() => {
                               navigator.clipboard.writeText(currentFamily.code);
-                              alert('Kode disalin!');
+                              showToast('Kode keluarga berhasil disalin!');
                             }}>
                             <Copy size={14} /> Salin
                           </button>
@@ -2083,12 +2099,11 @@ const App = () => {
                           </button>
                           <button className="btn glass" style={{ padding: '10px 14px', fontSize: '0.82rem', gap: 6, color: 'var(--danger)' }}
                             title="Generate kode baru (kode lama tidak berlaku)"
-                            onClick={async () => {
-                              if (!confirm('Kode lama akan tidak berlaku. Lanjutkan?')) return;
+                            onClick={() => openConfirm('Kode lama akan tidak berlaku. Lanjutkan?', async () => {
                               const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
                               const { error } = await supabase.from('families').update({ code: newCode }).eq('id', currentFamily.id);
-                              if (!error) setCurrentFamily(prev => ({ ...prev, code: newCode }));
-                            }}>
+                              if (!error) { setCurrentFamily(prev => ({ ...prev, code: newCode })); showToast('Kode berhasil diperbarui!'); }
+                            })}>
                             <RefreshCw size={14} /> Regenerate
                           </button>
                         </div>
@@ -2112,14 +2127,16 @@ const App = () => {
                       <input type="password" className="fi" placeholder="PIN seragam untuk semua anggota..." value={globalPin} onChange={e => setGlobalPin(e.target.value)} maxLength={20} style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem' }} />
                       <button className="btn btn-primary" style={{ flexShrink: 0, padding: '8px 16px', fontSize: '0.82rem' }}
                         disabled={!globalPin}
-                        onClick={async () => {
-                          if (!globalPin || !confirm(`Set PIN "${globalPin}" untuk semua ${familyMembers.length} anggota?`)) return;
-                          setFamilyMembers(prev => prev.map(m => ({ ...m, pin: globalPin })));
-                          if (supabase && currentFamily?.id) {
-                            await supabase.from('family_members').update({ pin: globalPin }).eq('family_id', currentFamily.id);
-                          }
-                          setGlobalPin('');
-                          alert('PIN seragam berhasil di-set!');
+                        onClick={() => {
+                          if (!globalPin) return;
+                          openConfirm(`Set PIN "${globalPin}" untuk semua ${familyMembers.length} anggota?`, async () => {
+                            setFamilyMembers(prev => prev.map(m => ({ ...m, pin: globalPin })));
+                            if (supabase && currentFamily?.id) {
+                              await supabase.from('family_members').update({ pin: globalPin }).eq('family_id', currentFamily.id);
+                            }
+                            setGlobalPin('');
+                            showToast('PIN seragam berhasil di-set!');
+                          });
                         }}>
                         <Key size={13} /> Set Semua
                       </button>
@@ -2214,7 +2231,7 @@ const App = () => {
                                     onClick={async () => {
                                       if (!supabase || !currentFamily?.id) return;
                                       const { error } = await supabase.from('families').update({ plan: key }).eq('id', currentFamily.id);
-                                      if (!error) { setUserPlan(key); setCurrentFamily(prev => ({ ...prev, plan: key })); alert(`Paket diubah ke ${p.name}!`); }
+                                      if (!error) { setUserPlan(key); setCurrentFamily(prev => ({ ...prev, plan: key })); showToast(`Paket diubah ke ${p.name}!`); }
                                     }}>
                                     {key === 'free' ? 'Downgrade' : 'Upgrade'} →
                                   </button>
@@ -2345,7 +2362,7 @@ const App = () => {
                   {user && (
                     <button className="btn btn-primary" onClick={() => {
                       if (!canAddMember) {
-                        alert(`Batas paket ${planConfig.name}: maks ${planConfig.maxMembers} anggota. Upgrade paket untuk menambah lebih banyak.`);
+                        openProModal(`Batas paket ${planConfig.name}: maks ${planConfig.maxMembers} anggota. Upgrade paket untuk menambah lebih banyak.`);
                         return;
                       }
                       handleAdd();
@@ -2598,6 +2615,98 @@ const App = () => {
       {showMapView && (
         <MapView familyMembers={familyMembers} onClose={() => setShowMapView(false)} />
       )}
+
+      {/* ── Toast Notification ── */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key="toast"
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            style={{
+              position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 99999, background: toast.type === 'error' ? '#ef4444' : toast.type === 'info' ? '#0ea5e9' : '#059669',
+              color: 'white', padding: '12px 24px', borderRadius: 12, fontWeight: 600,
+              fontSize: '0.88rem', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', whiteSpace: 'nowrap',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}
+          >
+            {toast.type === 'error' ? '✗' : '✓'} {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Pro Gate Modal ── */}
+      <AnimatePresence>
+        {proModal && (
+          <motion.div
+            key="promodal-bg"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 99998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(8px)' }}
+            onClick={() => setProModal(null)}
+          >
+            <motion.div
+              key="promodal"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass"
+              style={{ maxWidth: 400, width: '100%', padding: '32px 28px', textAlign: 'center' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#f59e0b,#d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <Crown size={26} color="white" />
+              </div>
+              <div style={{ fontWeight: 800, fontSize: '1.15rem', marginBottom: 8 }}>Fitur Premium</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.6 }}>{proModal.message}</div>
+              {userRole === 'super_admin' ? (
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn glass" style={{ flex: 1, justifyContent: 'center', padding: '10px' }} onClick={() => setProModal(null)}>Nanti</button>
+                  <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '10px' }} onClick={() => { setProModal(null); setView('settings'); }}>
+                    <Star size={14} /> Upgrade Paket
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', padding: '10px', background: 'var(--primary-light)', borderRadius: 8 }}>
+                    Hubungi admin keluarga untuk upgrade paket.
+                  </div>
+                  <button className="btn btn-primary" style={{ justifyContent: 'center', padding: '10px' }} onClick={() => setProModal(null)}>Mengerti</button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Confirm Modal ── */}
+      <AnimatePresence>
+        {confirmModal && (
+          <motion.div
+            key="confirm-bg"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 99997, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(8px)' }}
+          >
+            <motion.div
+              key="confirm"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass"
+              style={{ maxWidth: 380, width: '100%', padding: '28px 24px', textAlign: 'center' }}
+            >
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(217,119,6,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                <ShieldCheck size={22} style={{ color: 'var(--primary)' }} />
+              </div>
+              <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 8 }}>Konfirmasi</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 22, lineHeight: 1.6 }}>{confirmModal.message}</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn glass" style={{ flex: 1, justifyContent: 'center', padding: '10px' }} onClick={() => setConfirmModal(null)}>Batal</button>
+                <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '10px' }} onClick={() => { confirmModal.onConfirm(); setConfirmModal(null); }}>
+                  Ya, Lanjutkan
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── View Member Modal ── */}
       {viewTarget && (() => {
@@ -2970,7 +3079,7 @@ const App = () => {
                               <MapPin size={13} /> Maps
                             </a>
                           ) : (
-                            <button className="maps-btn" onClick={() => alert('Fitur Maps tersedia di paket Starter ke atas.')} style={{ cursor: 'pointer', border: 'none' }}>
+                            <button className="maps-btn" onClick={() => openProModal('Fitur Maps tersedia di paket Starter ke atas.')} style={{ cursor: 'pointer', border: 'none' }}>
                               🔒 Maps
                             </button>
                           )
