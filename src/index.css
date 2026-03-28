@@ -867,4 +867,4 @@ body {
 /* Ensure fi input works everywhere */
 textarea.fi { padding: 10px 14px; }
 select.fi { padding: 10px 14px; appearance: none; cursor: pointer; }
-select.fi:read-only { pointer-events: none; }
+select.fi[disabled] { pointer-events: none; opacity: 0.6; }
