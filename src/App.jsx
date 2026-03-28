@@ -204,6 +204,10 @@ const App = () => {
   // State untuk Delete Modal
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
+
+  // State untuk Bulk Delete
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   
   // State untuk Reset Total Modal
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1141,6 +1145,35 @@ const App = () => {
     setDeleteInput('');
   };
 
+  const toggleSelectMember = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (filteredMembers) => {
+    if (selectedIds.size === filteredMembers.length && filteredMembers.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredMembers.map(m => m.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!user) { alert('Anda harus login untuk menghapus data.'); return; }
+    const idsToDelete = [...selectedIds];
+    setFamilyMembers(prev => prev.filter(m => !selectedIds.has(m.id)));
+    if (supabase) {
+      const { error } = await supabase.from('family_members').delete().in('id', idsToDelete);
+      if (error) console.error('Gagal hapus bulk di Supabase:', error);
+    }
+    setSelectedIds(new Set());
+    setShowBulkDeleteConfirm(false);
+  };
+
   const confirmDelete = async () => {
     if (!user) {
         alert('Anda harus login untuk menghapus data.');
@@ -1839,11 +1872,50 @@ const App = () => {
               </div>
 
               <div className="glass" style={{ padding: '24px', overflowX: 'auto', marginBottom: '40px' }}>
-                {tableTab === 'members' && (
+                {tableTab === 'members' && (() => {
+                  const filteredMembers = familyMembers
+                    .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .sort((a, b) => a.id.toString().localeCompare(b.id.toString(), undefined, { numeric: true }));
+                  const allSelected = filteredMembers.length > 0 && selectedIds.size === filteredMembers.length;
+                  const someSelected = selectedIds.size > 0 && !allSelected;
+                  return (
                   <div className="table-wrapper">
+                  {user && selectedIds.size > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', padding: '10px 14px', background: 'rgba(239,68,68,0.08)', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#ef4444' }}>
+                        {selectedIds.size} anggota dipilih
+                      </span>
+                      <button
+                        className="btn"
+                        style={{ padding: '6px 14px', background: '#ef4444', color: 'white', borderRadius: '8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        onClick={() => setShowBulkDeleteConfirm(true)}
+                      >
+                        <Trash2 size={14} /> Hapus Terpilih
+                      </button>
+                      <button
+                        className="btn glass"
+                        style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                        onClick={() => setSelectedIds(new Set())}
+                      >
+                        Batal Pilih
+                      </button>
+                    </div>
+                  )}
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)' }}>
+                        {user && (
+                          <th style={{ padding: '12px', width: '40px' }}>
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              ref={el => { if (el) el.indeterminate = someSelected; }}
+                              onChange={() => toggleSelectAll(filteredMembers)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                              title="Pilih semua"
+                            />
+                          </th>
+                        )}
                         <th style={{ padding: '12px', textAlign: 'left' }}>Anggota</th>
                         <th style={{ padding: '12px', textAlign: 'left' }}>Orang Tua</th>
                         <th style={{ padding: '12px', textAlign: 'left' }}>Status</th>
@@ -1851,11 +1923,18 @@ const App = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {familyMembers
-                        .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .sort((a, b) => a.id.toString().localeCompare(b.id.toString(), undefined, { numeric: true }))
-                        .map(m => (
-                        <tr key={m.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
+                      {filteredMembers.map(m => (
+                        <tr key={m.id} style={{ borderBottom: '1px solid var(--border-card)', background: selectedIds.has(m.id) ? 'rgba(239,68,68,0.05)' : 'transparent' }}>
+                          {user && (
+                            <td style={{ padding: '12px', width: '40px' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(m.id)}
+                                onChange={() => toggleSelectMember(m.id)}
+                                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                              />
+                            </td>
+                          )}
                           <td style={{ padding: '12px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             {m.photo ? (
@@ -1897,7 +1976,8 @@ const App = () => {
                   </tbody>
                 </table>
               </div>
-                )}
+                  );
+                })()}
 
                 {tableTab === 'birthdays' && (
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -2231,6 +2311,31 @@ const App = () => {
                 Hapus Permanen
               </button>
               <button className="btn glass" style={{ flex: 1 }} onClick={() => setDeleteTarget(null)}>
+                Batal
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass" style={{ width: '100%', maxWidth: '400px', padding: '25px', color: 'var(--text-main)', textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🗑️</div>
+            <h3 style={{ marginBottom: '12px' }}>Hapus {selectedIds.size} Anggota?</h3>
+            <p style={{ fontSize: '0.85rem', marginBottom: '24px', opacity: 0.8 }}>
+              Data yang dihapus tidak dapat dikembalikan. Yakin ingin menghapus <strong>{selectedIds.size} anggota</strong> yang dipilih secara permanen?
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                className="btn"
+                style={{ flex: 1, padding: '12px', background: '#ef4444', color: 'white', borderRadius: '10px' }}
+                onClick={handleBulkDelete}
+              >
+                Ya, Hapus Semua
+              </button>
+              <button className="btn glass" style={{ flex: 1, padding: '12px' }} onClick={() => setShowBulkDeleteConfirm(false)}>
                 Batal
               </button>
             </div>
