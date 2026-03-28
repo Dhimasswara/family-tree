@@ -102,13 +102,12 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
         .single();
       if (famErr || !fam) throw new Error('Kode keluarga tidak ditemukan.');
 
-      // Get members with PIN for this family
+      // Get all members for this family
       const { data: members, error: memErr } = await supabase
         .from('family_members')
         .select('id, name, gender, photo, pin')
         .eq('family_id', fam.id)
-        .not('pin', 'is', null)
-        .neq('pin', '');
+        .order('name');
       if (memErr) throw memErr;
 
       setMemberList({ family: fam, members: members || [] });
@@ -122,7 +121,9 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
     if (!selectedMemberId) { setError('Pilih nama kamu.'); return; }
     if (!pin) { setError('Masukkan PIN.'); return; }
     const member = memberList?.members?.find(m => m.id === selectedMemberId);
-    if (!member || member.pin !== pin) { setError('PIN salah.'); return; }
+    if (!member) { setError('Anggota tidak ditemukan.'); return; }
+    if (!member.pin) { setError('PIN belum di-set. Hubungi admin keluarga.'); return; }
+    if (member.pin !== pin) { setError('PIN salah.'); return; }
     onFamilyLoginSuccess(member, memberList.family);
   };
 
