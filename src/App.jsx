@@ -239,6 +239,7 @@ const App = () => {
   const [tableTab, setTableTab] = useState('members'); // 'members', 'birthdays', 'anniversaries'
   const [editingId, setEditingId] = useState(null);
   const [editBuffer, setEditBuffer] = useState({});
+  const [editModalTab, setEditModalTab] = useState('biodata');
   const [theme, setTheme] = useState('light');
   
   // State untuk Delete Modal
@@ -1076,6 +1077,7 @@ const App = () => {
 
   const handleEdit = useCallback((member) => {
     setEditingId(member.id);
+    setEditModalTab('biodata');
     setEditBuffer({
       ...member,
       name: member.name || '',
@@ -2143,312 +2145,368 @@ const App = () => {
       />
 
       {/* Edit Overlay */}
-      {editingId && (
-        <div className="modal-overlay">
-          <motion.div 
-            initial={{ scale: 0.95, opacity: 0, y: 20 }} 
-            animate={{ scale: 1, opacity: 1, y: 0 }} 
-            className="modal-container"
-          >
-            <div className="modal-header">
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
-                {user ? 'Edit Data Keluarga' : 'Detail Anggota Keluarga'}
-              </h2>
-              <button className="btn glass" style={{ padding: '8px', minWidth: 'auto', borderRadius: '50%', border: 'none' }} onClick={() => setEditingId(null)}>
-                <X size={20} />
-              </button>
-            </div>
+      {editingId && (() => {
+        const isMale = editBuffer.gender === 'male';
+        const isDeceased = editBuffer.isDeceased;
+        const heroGradient = isDeceased
+          ? 'linear-gradient(135deg, #94a3b8, #64748b)'
+          : isMale
+            ? 'linear-gradient(135deg, #0ea5e9, #6366f1)'
+            : 'linear-gradient(135deg, #db2777, #f43f5e)';
+        const birthYear = editBuffer.birth
+          ? new Date(editBuffer.birth).getFullYear() : null;
+        const nasabLabel = getNasabLabel(editBuffer, familyMembers);
 
-            <div className="modal-body">
-              {/* Seksi Biodata */}
-              <div className="form-section">
-                <div className="section-title"><User size={18} /> Biodata Utama</div>
-                
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    {editBuffer.photo ? (
-                      <img src={editBuffer.photo} alt={editBuffer.name} style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--primary)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                    ) : (
-                      <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: editBuffer.gender === 'male' ? 'linear-gradient(135deg, #0ea5e9, #38bdf8)' : 'linear-gradient(135deg, #db2777, #f472b6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                        <User size={50} />
-                      </div>
-                    )}
-                    {user && (
-                      <label htmlFor="image-upload" style={{ position: 'absolute', bottom: 0, right: 0, background: 'var(--primary)', padding: '6px', borderRadius: '50%', cursor: 'pointer', color: 'white', border: '2px solid white', display: 'flex' }}>
-                        <Camera size={14} />
-                        <input id="image-upload" type="file" accept="image/*" hidden onChange={handleImageUpload} />
-                      </label>
-                    )}
+        return (
+          <div className="modal-overlay">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 24 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="modal-container"
+            >
+              {/* Floating close */}
+              <button className="modal-close-btn" onClick={() => setEditingId(null)}>
+                <X size={17} />
+              </button>
+
+              {/* ── Hero ── */}
+              <div className="modal-hero" style={{ background: heroGradient }}>
+                <div className="modal-hero-avatar">
+                  {editBuffer.photo ? (
+                    <img src={editBuffer.photo} alt={editBuffer.name} />
+                  ) : (
+                    <div className="avatar-placeholder">
+                      <User size={36} />
+                    </div>
+                  )}
+                  <span className={`hero-status-dot ${isDeceased ? 'deceased' : 'alive'}`} />
+                  {user && (
+                    <label className="hero-camera" htmlFor="image-upload" title="Ganti foto">
+                      <Camera size={13} />
+                      <input id="image-upload" type="file" accept="image/*" hidden onChange={handleImageUpload} />
+                    </label>
+                  )}
+                </div>
+
+                <div className="modal-hero-info">
+                  <h2>{editBuffer.name || 'Nama Belum Diisi'}</h2>
+                  <div className="modal-hero-meta">
+                    <span className="hero-meta-chip">
+                      {isMale ? '♂ Laki-laki' : '♀ Perempuan'}
+                    </span>
+                    {birthYear && <span className="hero-meta-chip">🎂 {birthYear}</span>}
+                    <span className={`hero-meta-chip ${isDeceased ? 'deceased' : 'alive'}`}>
+                      {isDeceased ? '✝ Almarhum/ah' : '● Masih Hidup'}
+                    </span>
+                    {nasabLabel && <span className="hero-meta-chip nasab">{nasabLabel}</span>}
                   </div>
-                  
-                  <div style={{ flex: 1, minWidth: '200px' }}>
+                </div>
+              </div>
+
+              {/* ── Tabs ── */}
+              <div className="modal-tabs">
+                <button className={`modal-tab-btn ${editModalTab === 'biodata' ? 'active' : ''}`} onClick={() => setEditModalTab('biodata')}>
+                  <User size={14} /> Biodata
+                </button>
+                <button className={`modal-tab-btn ${editModalTab === 'nasab' ? 'active' : ''}`} onClick={() => setEditModalTab('nasab')}>
+                  <Users size={14} /> Hubungan Nasab
+                </button>
+                <button className={`modal-tab-btn ${editModalTab === 'detail' ? 'active' : ''}`} onClick={() => setEditModalTab('detail')}>
+                  <FileText size={14} /> Info Lainnya
+                </button>
+              </div>
+
+              {/* ── Tab Body ── */}
+              <div className="modal-body">
+
+                {/* TAB: BIODATA */}
+                {editModalTab === 'biodata' && (
+                  <div className="form-section">
                     <div className="form-group">
                       <label className="form-label">Nama Lengkap</label>
-                      <input 
-                        readOnly={!user} 
-                        value={editBuffer.name} 
-                        onChange={e => setEditBuffer({ ...editBuffer, name: e.target.value })} 
-                        className="glass" 
-                        style={{ width: '100%', padding: '12px', background: 'var(--control-bg)', color: 'inherit', fontSize: '1rem', fontWeight: 600 }} 
-                        placeholder="Contoh: Ahmad Zaki" 
+                      <input
+                        readOnly={!user}
+                        value={editBuffer.name}
+                        onChange={e => setEditBuffer({ ...editBuffer, name: e.target.value })}
+                        className="fi"
+                        style={{ fontSize: '1rem', fontWeight: 700 }}
+                        placeholder="Contoh: Ahmad Zaki bin Hasan"
+                      />
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label className="form-label">Jenis Kelamin</label>
+                        <select
+                          disabled={!user}
+                          value={editBuffer.gender}
+                          onChange={e => setEditBuffer({ ...editBuffer, gender: e.target.value })}
+                          className="fi"
+                        >
+                          <option value="male">♂ Laki-laki</option>
+                          <option value="female">♀ Perempuan</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Tanggal Lahir</label>
+                        <input
+                          readOnly={!user}
+                          type="date"
+                          value={editBuffer.birth}
+                          onChange={e => setEditBuffer({ ...editBuffer, birth: e.target.value })}
+                          className="fi"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Status hidup */}
+                    <div className="form-group">
+                      <label className="form-label">Status Kehidupan</label>
+                      <label className={`status-toggle ${isDeceased ? 'deceased' : 'alive'}`} style={{ cursor: user ? 'pointer' : 'default' }}>
+                        <input
+                          type="checkbox"
+                          disabled={!user}
+                          checked={editBuffer.isDeceased}
+                          onChange={e => setEditBuffer({ ...editBuffer, isDeceased: e.target.checked, death: e.target.checked ? (editBuffer.death || '') : '' })}
+                          style={{ width: 20, height: 20, accentColor: isDeceased ? '#ef4444' : '#22c55e', flexShrink: 0 }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem', color: isDeceased ? '#ef4444' : '#22c55e' }}>
+                            {isDeceased ? 'Sudah Wafat (Almarhum/ah)' : 'Masih Hidup'}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', opacity: 0.6, marginTop: 2 }}>Centang jika anggota keluarga telah wafat</div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {editBuffer.isDeceased && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="form-group">
+                        <label className="form-label">Tanggal Wafat <span style={{ fontWeight: 400, opacity: 0.5 }}>(opsional)</span></label>
+                        <input
+                          readOnly={!user}
+                          type="date"
+                          value={editBuffer.death}
+                          onChange={e => setEditBuffer({ ...editBuffer, death: e.target.value })}
+                          className="fi"
+                        />
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB: NASAB */}
+                {editModalTab === 'nasab' && (
+                  <div className="form-section">
+                    <div className="form-group">
+                      <label className="form-label">Pasangan</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {editBuffer.spouses?.map((s, idx) => (
+                          <div key={idx} className="spouse-card">
+                            <div className="spouse-card-grid">
+                              <div className="form-group">
+                                <label className="form-label" style={{ fontSize: '0.65rem' }}>Nama Pasangan</label>
+                                <select
+                                  disabled={!user}
+                                  value={s.id}
+                                  onChange={e => {
+                                    const ns = [...editBuffer.spouses];
+                                    ns[idx].id = e.target.value;
+                                    setEditBuffer({ ...editBuffer, spouses: ns });
+                                  }}
+                                  className="fi" style={{ fontSize: '0.85rem' }}
+                                >
+                                  <option value="">Pilih Pasangan...</option>
+                                  {familyMembers.filter(f => f.id !== editBuffer.id && f.gender !== editBuffer.gender).map(f => (
+                                    <option key={f.id} value={f.id}>{f.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label" style={{ fontSize: '0.65rem' }}>Tgl Nikah</label>
+                                <input
+                                  readOnly={!user}
+                                  type="date"
+                                  value={s.marriageDate || ''}
+                                  onChange={e => {
+                                    const ns = [...editBuffer.spouses];
+                                    ns[idx].marriageDate = e.target.value;
+                                    setEditBuffer({ ...editBuffer, spouses: ns });
+                                  }}
+                                  className="fi" style={{ fontSize: '0.85rem' }}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label" style={{ fontSize: '0.65rem' }}>Status</label>
+                                <select
+                                  disabled={!user}
+                                  value={s.type}
+                                  onChange={e => {
+                                    const ns = [...editBuffer.spouses];
+                                    ns[idx].type = e.target.value;
+                                    setEditBuffer({ ...editBuffer, spouses: ns });
+                                  }}
+                                  className="fi" style={{ fontSize: '0.85rem' }}
+                                >
+                                  <option value="married">💍 Menikah</option>
+                                  <option value="divorced">💔 Bercerai</option>
+                                </select>
+                              </div>
+                              {user && (
+                                <button
+                                  onClick={() => setEditBuffer({ ...editBuffer, spouses: editBuffer.spouses.filter((_, i) => i !== idx) })}
+                                  className="btn glass"
+                                  style={{ padding: '8px', color: '#ef4444', minWidth: 'auto', alignSelf: 'flex-end' }}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {user && (
+                          <button
+                            onClick={() => setEditBuffer({ ...editBuffer, spouses: [...(editBuffer.spouses || []), { id: '', type: 'married' }] })}
+                            className="btn glass"
+                            style={{ width: '100%', justifyContent: 'center', color: 'var(--primary)', borderStyle: 'dashed', padding: '11px' }}
+                          >
+                            <Plus size={15} /> Tambah Pasangan
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label className="form-label">Ayah Kandung</label>
+                        <select
+                          disabled={!user}
+                          value={editBuffer.fatherId || ''}
+                          onChange={e => setEditBuffer({ ...editBuffer, fatherId: e.target.value })}
+                          className="fi"
+                        >
+                          <option value="">— Tidak Diketahui</option>
+                          {familyMembers.filter(f => f.id !== editBuffer.id && f.gender === 'male').map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Ibu Kandung</label>
+                        <select
+                          disabled={!user}
+                          value={editBuffer.motherId || ''}
+                          onChange={e => setEditBuffer({ ...editBuffer, motherId: e.target.value })}
+                          className="fi"
+                        >
+                          <option value="">— Tidak Diketahui</option>
+                          {familyMembers.filter(f => f.id !== editBuffer.id && f.gender === 'female').map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB: INFO LAINNYA */}
+                {editModalTab === 'detail' && (
+                  <div className="form-section">
+                    <div className="form-group">
+                      <label className="form-label"><MapPin size={13} /> Alamat</label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <textarea
+                          readOnly={!user}
+                          rows={2}
+                          value={editBuffer.address}
+                          onChange={e => setEditBuffer({ ...editBuffer, address: e.target.value })}
+                          className="fi"
+                          style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                          placeholder="Jl. Merdeka No. 10, Jakarta Selatan"
+                        />
+                        {editBuffer.address && (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(editBuffer.address)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="maps-btn"
+                          >
+                            <MapPin size={13} /> Maps
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label className="form-label"><Briefcase size={13} /> Pekerjaan</label>
+                        <input
+                          readOnly={!user}
+                          value={editBuffer.occupation}
+                          onChange={e => setEditBuffer({ ...editBuffer, occupation: e.target.value })}
+                          className="fi"
+                          placeholder="Dokter, Guru, Wiraswasta..."
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label"><GraduationCap size={13} /> Pendidikan Terakhir</label>
+                        <input
+                          readOnly={!user}
+                          value={editBuffer.education}
+                          onChange={e => setEditBuffer({ ...editBuffer, education: e.target.value })}
+                          className="fi"
+                          placeholder="S1 Teknik, SMA Negeri 1..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label"><Phone size={13} /> No. Telepon / HP</label>
+                      <input
+                        readOnly={!user}
+                        value={editBuffer.phone}
+                        onChange={e => setEditBuffer({ ...editBuffer, phone: e.target.value })}
+                        className="fi"
+                        placeholder="08123456789"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label"><FileText size={13} /> Catatan</label>
+                      <textarea
+                        readOnly={!user}
+                        rows={4}
+                        value={editBuffer.notes}
+                        onChange={e => setEditBuffer({ ...editBuffer, notes: e.target.value })}
+                        className="fi"
+                        style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                        placeholder="Cerita singkat, prestasi, atau hal penting lainnya..."
                       />
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">Jenis Kelamin</label>
-                    <select disabled={!user} value={editBuffer.gender} onChange={e => setEditBuffer({ ...editBuffer, gender: e.target.value })} className="glass" style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}>
-                      <option value="male">Laki-laki</option>
-                      <option value="female">Perempuan</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Tanggal Lahir</label>
-                    <input readOnly={!user} type="date" value={editBuffer.birth} onChange={e => setEditBuffer({ ...editBuffer, birth: e.target.value })} className="glass" style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }} />
-                  </div>
-                </div>
               </div>
 
-              {/* Seksi Status */}
-              <div className="form-section">
-                <div className="section-title"><Heart size={18} /> Status Kehidupan</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <label className="glass" style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: user ? 'pointer' : 'default', padding: '12px', background: editBuffer.isDeceased ? 'rgba(239, 68, 68, 0.03)' : 'rgba(34, 197, 94, 0.03)', border: editBuffer.isDeceased ? '1px solid rgba(239, 68, 68, 0.1)' : '1px solid rgba(34, 197, 94, 0.1)' }}>
-                    <input 
-                      type="checkbox" 
-                      disabled={!user}
-                      checked={editBuffer.isDeceased} 
-                      onChange={e => setEditBuffer({ ...editBuffer, isDeceased: e.target.checked, death: e.target.checked ? (editBuffer.death || '') : '' })}
-                      style={{ width: '20px', height: '20px', accentColor: '#ef4444' }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 700, color: editBuffer.isDeceased ? '#ef4444' : '#22c55e', fontSize: '0.9rem' }}>
-                        {editBuffer.isDeceased ? 'Sudah Wafat (Almarhum/ah)' : 'Masih Hidup'}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>Aktifkan jika anggota keluarga telah meninggal dunia</div>
-                    </div>
-                  </label>
-                  
-                  {editBuffer.isDeceased && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="form-group">
-                      <label className="form-label">Tanggal Wafat (Opsional)</label>
-                      <input readOnly={!user} type="date" value={editBuffer.death} onChange={e => setEditBuffer({ ...editBuffer, death: e.target.value })} className="glass" style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }} />
-                    </motion.div>
-                  )}
-                </div>
-              </div>
-
-              {/* Seksi Hubungan Nasab */}
-              <div className="form-section">
-                <div className="section-title"><Users size={18} /> Hubungan Nasab</div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div className="form-group">
-                    <label className="form-label">Daftar Pasangan</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {editBuffer.spouses?.map((s, idx) => (
-                        <div key={idx} className="spouse-card">
-                          <div className="spouse-card-grid">
-                            <div className="form-group">
-                              <label className="form-label" style={{ fontSize: '0.65rem' }}>Nama Pasangan</label>
-                              <select
-                                disabled={!user}
-                                value={s.id}
-                                onChange={e => {
-                                  const newSpouses = [...editBuffer.spouses];
-                                  newSpouses[idx].id = e.target.value;
-                                  setEditBuffer({ ...editBuffer, spouses: newSpouses });
-                                }}
-                                className="glass" style={{ width: '100%', padding: '8px', background: 'var(--control-bg)', fontSize: '0.85rem' }}
-                              >
-                                <option value="">Pilih Pasangan...</option>
-                                {familyMembers.filter(f => f.id !== editBuffer.id && f.gender !== editBuffer.gender).map(f => (
-                                  <option key={f.id} value={f.id}>{f.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="form-group">
-                              <label className="form-label" style={{ fontSize: '0.65rem' }}>Tgl Nikah</label>
-                              <input 
-                                readOnly={!user}
-                                type="date"
-                                value={s.marriageDate || ''}
-                                onChange={e => {
-                                  const newSpouses = [...editBuffer.spouses];
-                                  newSpouses[idx].marriageDate = e.target.value;
-                                  setEditBuffer({ ...editBuffer, spouses: newSpouses });
-                                }}
-                                className="glass" style={{ width: '100%', padding: '8px', background: 'var(--control-bg)', fontSize: '0.85rem' }}
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label className="form-label" style={{ fontSize: '0.65rem' }}>Status</label>
-                              <select
-                                disabled={!user}
-                                value={s.type}
-                                onChange={e => {
-                                  const newSpouses = [...editBuffer.spouses];
-                                  newSpouses[idx].type = e.target.value;
-                                  setEditBuffer({ ...editBuffer, spouses: newSpouses });
-                                }}
-                                className="glass" style={{ width: '100%', padding: '8px', background: 'var(--control-bg)', fontSize: '0.85rem' }}
-                              >
-                                <option value="married">Menikah</option>
-                                <option value="divorced">Bercerai</option>
-                              </select>
-                            </div>
-                            {user && (
-                              <button 
-                                onClick={() => {
-                                  const newSpouses = editBuffer.spouses.filter((_, i) => i !== idx);
-                                  setEditBuffer({ ...editBuffer, spouses: newSpouses });
-                                }} 
-                                className="btn glass"
-                                style={{ padding: '8px', color: '#ef4444', minWidth: 'auto' }}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      
-                      {user && (
-                        <button
-                          onClick={() => setEditBuffer({ ...editBuffer, spouses: [...(editBuffer.spouses || []), { id: '', type: 'married' }] })}
-                          className="btn glass" style={{ width: '100%', justifyContent: 'center', background: 'rgba(99, 102, 241, 0.03)', color: 'var(--primary)', borderStyle: 'dashed', padding: '10px' }}
-                        >
-                          <Plus size={16} /> Tambah Pasangan
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label className="form-label">Ayah Kandung</label>
-                      <select disabled={!user} value={editBuffer.fatherId || ''} onChange={e => setEditBuffer({ ...editBuffer, fatherId: e.target.value })} className="glass" style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}>
-                        <option value="">Tidak Diketahui</option>
-                        {familyMembers.filter(f => f.id !== editBuffer.id && f.gender === 'male').map(f => (
-                          <option key={f.id} value={f.id}>{f.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Ibu Kandung</label>
-                      <select disabled={!user} value={editBuffer.motherId || ''} onChange={e => setEditBuffer({ ...editBuffer, motherId: e.target.value })} className="glass" style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}>
-                        <option value="">Tidak Diketahui</option>
-                        {familyMembers.filter(f => f.id !== editBuffer.id && f.gender === 'female').map(f => (
-                          <option key={f.id} value={f.id}>{f.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-              {/* Seksi Informasi Tambahan */}
-              <div className="form-section">
-                <div className="section-title"><FileText size={18} /> Informasi Tambahan <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}>(opsional)</span></div>
-
-                <div className="form-group">
-                  <label className="form-label"><MapPin size={13} style={{ display: 'inline', marginRight: 4 }} />Alamat</label>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                    <textarea
-                      readOnly={!user}
-                      rows={2}
-                      value={editBuffer.address}
-                      onChange={e => setEditBuffer({ ...editBuffer, address: e.target.value })}
-                      className="glass"
-                      style={{ flex: 1, padding: '10px', background: 'var(--control-bg)', color: 'inherit', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.9rem' }}
-                      placeholder="Contoh: Jl. Merdeka No. 10, Jakarta Selatan"
-                    />
-                    {editBuffer.address && (
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(editBuffer.address)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn glass"
-                        style={{ padding: '10px', flexShrink: 0, color: '#0ea5e9', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', textDecoration: 'none' }}
-                        title="Buka di Google Maps"
-                      >
-                        <MapPin size={14} /> Maps
-                      </a>
-                    )}
-                  </div>
-                </div>
-
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label"><Briefcase size={13} style={{ display: 'inline', marginRight: 4 }} />Pekerjaan</label>
-                    <input
-                      readOnly={!user}
-                      value={editBuffer.occupation}
-                      onChange={e => setEditBuffer({ ...editBuffer, occupation: e.target.value })}
-                      className="glass"
-                      style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}
-                      placeholder="Contoh: Dokter, Guru, Wiraswasta..."
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label"><GraduationCap size={13} style={{ display: 'inline', marginRight: 4 }} />Pendidikan Terakhir</label>
-                    <input
-                      readOnly={!user}
-                      value={editBuffer.education}
-                      onChange={e => setEditBuffer({ ...editBuffer, education: e.target.value })}
-                      className="glass"
-                      style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}
-                      placeholder="Contoh: S1 Teknik, SMA Negeri 1..."
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label"><Phone size={13} style={{ display: 'inline', marginRight: 4 }} />No. Telepon / HP</label>
-                  <input
-                    readOnly={!user}
-                    value={editBuffer.phone}
-                    onChange={e => setEditBuffer({ ...editBuffer, phone: e.target.value })}
-                    className="glass"
-                    style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}
-                    placeholder="Contoh: 08123456789"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label"><FileText size={13} style={{ display: 'inline', marginRight: 4 }} />Catatan</label>
-                  <textarea
-                    readOnly={!user}
-                    rows={3}
-                    value={editBuffer.notes}
-                    onChange={e => setEditBuffer({ ...editBuffer, notes: e.target.value })}
-                    className="glass"
-                    style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.9rem' }}
-                    placeholder="Cerita singkat, prestasi, atau hal penting lainnya..."
-                  />
-                </div>
-              </div>
-
-            <div className="modal-footer">
-              {user ? (
-                <>
-                  <button className="btn glass" style={{ padding: '12px 24px' }} onClick={() => setEditingId(null)}>Batal</button>
-                  <button className="btn btn-primary" style={{ padding: '12px 24px' }} onClick={handleSave}>
-                    <Save size={18} /> Simpan Perubahan
+              {/* ── Footer ── */}
+              <div className="modal-footer">
+                {user ? (
+                  <>
+                    <button className="btn glass" style={{ padding: '11px 22px' }} onClick={() => setEditingId(null)}>Batal</button>
+                    <button className="btn btn-primary" style={{ padding: '11px 22px' }} onClick={handleSave}>
+                      <Save size={16} /> Simpan
+                    </button>
+                  </>
+                ) : (
+                  <button className="btn btn-primary" style={{ padding: '11px 28px' }} onClick={() => setEditingId(null)}>
+                    Tutup
                   </button>
-                </>
-              ) : (
-                <button className="btn btn-primary" style={{ padding: '12px 32px' }} onClick={() => setEditingId(null)}>
-                  Tutup
-                </button>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      )}
+                )}
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
       
       {/* Delete Confirmation Modal */}
       {deleteTarget && (

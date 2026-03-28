@@ -1,121 +1,91 @@
 import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Heart, User, UserCheck } from 'lucide-react';
+import { Heart, User } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-// Custom Avatar Component
-const Avatar = ({ data, isMale }) => {
-    if (data.photo && !data.photo.includes('unsplash.com')) {
-        return <img src={data.photo} alt={data.name} className="node-avatar" />;
-    }
-
-    return (
-        <motion.div
-            className={`node-avatar placeholder ${data.gender}`}
-            animate={{
-                scale: [1, 1.05, 1],
-                rotate: [0, 2, -2, 0]
-            }}
-            transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut"
-            }}
-            style={{
-                background: isMale ? 'linear-gradient(135deg, #0ea5e9, #38bdf8)' : 'linear-gradient(135deg, #db2777, #f472b6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                border: '2px solid white'
-            }}
-        >
-            <User size={24} />
-        </motion.div>
-    );
-};
 
 const FamilyMemberNode = ({ data }) => {
     const isDeceased = !!data.death;
     const isMale = data.gender === 'male';
+    const gradient = isDeceased
+        ? 'linear-gradient(135deg, #94a3b8, #64748b)'
+        : isMale
+            ? 'linear-gradient(135deg, #0ea5e9, #6366f1)'
+            : 'linear-gradient(135deg, #db2777, #f43f5e)';
+    const accentColor = isDeceased ? '#94a3b8' : isMale ? '#0ea5e9' : '#db2777';
+
+    const birthYear = data.birth && !isNaN(new Date(data.birth).getFullYear())
+        ? new Date(data.birth).getFullYear() : '?';
+    const deathYear = data.death && !isNaN(new Date(data.death).getFullYear())
+        ? new Date(data.death).getFullYear() : null;
 
     return (
-        <div className={`family-node glass ${data.gender} ${isDeceased ? 'deceased' : ''}`}>
-            {/* Handles for Lineage */}
-            <Handle type="target" position={Position.Top} id="top" style={{ background: '#94a3b8' }} />
-
-            {/* Side handles for spanning connections (spouses/unions) */}
-            {/* We provide both target and source on both sides for maximum flexibility */}
-            <Handle type="target" position={Position.Left} id="left-target" style={{ left: 0, opacity: 0 }} />
-            <Handle type="source" position={Position.Left} id="left-source" style={{ left: 0, opacity: 0 }} />
-
+        <div className={`fn-card ${data.gender} ${isDeceased ? 'deceased' : ''}`}>
+            <Handle type="target" position={Position.Top} id="top" style={{ background: accentColor, width: 8, height: 8, border: '2px solid white' }} />
+            <Handle type="target" position={Position.Left}  id="left-target"  style={{ left: 0,  opacity: 0 }} />
+            <Handle type="source" position={Position.Left}  id="left-source"  style={{ left: 0,  opacity: 0 }} />
             <Handle type="target" position={Position.Right} id="right-target" style={{ right: 0, opacity: 0 }} />
             <Handle type="source" position={Position.Right} id="right-source" style={{ right: 0, opacity: 0 }} />
 
-            <div className="node-content">
-                <Avatar data={data} isMale={isMale} />
-                <div className="node-info">
-                    <div className="node-name">{data.name}</div>
-                    <div className="node-dates">
-                        {data.birth && !isNaN(new Date(data.birth).getFullYear()) ? new Date(data.birth).getFullYear() : '?'}
-                        {data.death && !isNaN(new Date(data.death).getFullYear()) ? ` - ${new Date(data.death).getFullYear()}` : ''}
+            {/* Gradient Header */}
+            <div className="fn-header" style={{ background: gradient }}>
+                {/* Spouse dots top-right */}
+                {data.spouses?.length > 0 && (
+                    <div className="fn-spouses">
+                        {data.spouses.map((s, i) => (
+                            <div key={i} className={`fn-spouse-dot ${s.type || 'married'}`} title={s.type === 'divorced' ? 'Bercerai' : 'Menikah'}>
+                                <Heart size={7} fill={s.type === 'divorced' ? 'transparent' : 'currentColor'} />
+                            </div>
+                        ))}
                     </div>
-                    {data.nasabLabel && (
-                        <div style={{
-                            marginTop: '4px',
-                            fontSize: '0.65rem',
-                            fontWeight: 600,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            background: isMale ? 'rgba(14,165,233,0.15)' : 'rgba(219,39,119,0.15)',
-                            color: isMale ? '#0369a1' : '#be185d',
-                            display: 'inline-block',
-                            letterSpacing: '0.02em',
-                        }}>
-                            {data.nasabLabel}
-                        </div>
+                )}
+
+                {/* Avatar */}
+                <div className="fn-avatar-wrap">
+                    {data.photo && !data.photo.includes('unsplash.com') ? (
+                        <img src={data.photo} alt={data.name} className="fn-avatar" />
+                    ) : (
+                        <motion.div
+                            className="fn-avatar fn-avatar-placeholder"
+                            animate={{ scale: [1, 1.05, 1] }}
+                            transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+                        >
+                            <User size={22} />
+                        </motion.div>
                     )}
-                    <div style={{
-                        marginTop: '4px',
-                        fontSize: '0.62rem',
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        color: isDeceased ? '#94a3b8' : '#22c55e',
-                    }}>
-                        <span style={{
-                            width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-                            background: isDeceased ? '#94a3b8' : '#22c55e',
-                            boxShadow: isDeceased ? 'none' : '0 0 4px #22c55e',
-                        }} />
-                        {isDeceased ? (data.gender === 'female' ? 'Almarhumah' : 'Almarhum') : 'Masih Hidup'}
-                    </div>
-                    {data.occupation && (
-                        <div style={{
-                            marginTop: '3px',
-                            fontSize: '0.62rem',
-                            opacity: 0.65,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: '130px',
-                        }}>
-                            💼 {data.occupation}
-                        </div>
-                    )}
+                    <span className={`fn-status-dot ${isDeceased ? 'deceased' : 'alive'}`} />
                 </div>
             </div>
 
-            <div className="spouse-indicators">
-                {data.spouses?.map((s, idx) => (
-                    <div key={idx} className={`spouse-dot ${s.type || 'married'}`} title={s.type === 'divorced' ? 'Bercerai' : 'Menikah'}>
-                        <Heart size={8} fill={s.type === 'divorced' ? 'transparent' : 'currentColor'} />
-                    </div>
-                ))}
+            {/* Body */}
+            <div className="fn-body">
+                <div className="fn-name">{data.name}</div>
+
+                <div className="fn-years" style={{ color: accentColor }}>
+                    {birthYear}{deathYear ? ` – ${deathYear}` : ''}
+                </div>
+
+                <div className="fn-tags">
+                    <span className={`fn-tag ${isDeceased ? 'tag-deceased' : 'tag-alive'}`}>
+                        {isDeceased
+                            ? (isMale ? 'Almarhum' : 'Almarhumah')
+                            : 'Masih Hidup'}
+                    </span>
+                    {data.nasabLabel && (
+                        <span className="fn-tag tag-nasab" style={{
+                            background: isMale ? 'rgba(14,165,233,0.12)' : 'rgba(219,39,119,0.12)',
+                            color: isMale ? '#0369a1' : '#be185d',
+                        }}>
+                            {data.nasabLabel}
+                        </span>
+                    )}
+                </div>
+
+                {data.occupation && (
+                    <div className="fn-occupation">💼 {data.occupation}</div>
+                )}
             </div>
 
-            <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: '#94a3b8' }} />
+            <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: accentColor, width: 8, height: 8, border: '2px solid white' }} />
         </div>
     );
 };

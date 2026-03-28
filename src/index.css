@@ -327,91 +327,162 @@ body {
   backdrop-filter: blur(8px);
 }
 
-.family-node {
-  padding: 12px;
-  border-radius: 12px;
-  width: 220px;
-  height: 85px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+/* ─── Legacy node (kept for safety) ─────────────────── */
+.family-node { display: none; }
+
+/* ─── New Node Card ───────────────────────────────────── */
+.fn-card {
+  width: 172px;
+  border-radius: 18px;
   overflow: visible;
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-card);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.09), 0 2px 6px rgba(0,0,0,0.05);
+  transition: box-shadow 0.25s, transform 0.25s;
+  cursor: pointer;
+  position: relative;
 }
 
-.node-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
+.fn-card:hover {
+  box-shadow: 0 16px 40px rgba(0,0,0,0.16);
+  transform: translateY(-3px);
 }
 
-.node-info {
-  flex: 1;
-  min-width: 0;
+.fn-card.deceased {
+  opacity: 0.82;
+}
+
+.fn-header {
+  border-radius: 18px 18px 0 0;
+  padding: 14px 12px 14px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  position: relative;
+  min-height: 80px;
+  justify-content: flex-end;
 }
 
-.node-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-  line-height: 1.3;
-  margin-bottom: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  word-break: break-word;
+.fn-avatar-wrap {
+  position: relative;
+  display: inline-flex;
 }
 
-
-.node-avatar {
-  width: 48px;
-  height: 48px;
+.fn-avatar {
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--border-card);
+  border: 3px solid rgba(255,255,255,0.85);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.22);
 }
 
-.node-avatar.placeholder.male { background: linear-gradient(135deg, #0ea5e9, #38bdf8); }
-.node-avatar.placeholder.female { background: linear-gradient(135deg, #db2777, #f472b6); }
-
-.spouse-indicators {
-  position: absolute;
-  top: -10px;
-  right: 10px;
-  display: flex;
-  gap: 4px;
-}
-
-.spouse-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+.fn-avatar-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
-  border: 1px solid var(--border-card);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  color: var(--primary);
+  color: white;
+  background: rgba(255,255,255,0.2);
+  border: 3px solid rgba(255,255,255,0.6);
 }
 
-.spouse-dot.divorced {
-  color: #94a3b8;
-  border-style: dashed;
+.fn-status-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2.5px solid white;
+  z-index: 1;
+}
+.fn-status-dot.alive    { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.7); }
+.fn-status-dot.deceased { background: #94a3b8; }
+
+.fn-spouses {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  display: flex;
+  gap: 3px;
 }
 
-.node-dates { font-size: 0.75rem; color: var(--text-muted); }
+.fn-spouse-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6366f1;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  font-size: 7px;
+}
+.fn-spouse-dot.divorced { color: #94a3b8; }
 
-.family-node.male { border-left: 4px solid var(--male-border); }
-.family-node.female { border-left: 4px solid var(--female-border); }
+.fn-body {
+  padding: 10px 12px 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
 
-/* React Flow customizations */
+.fn-name {
+  font-weight: 700;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--text-main);
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 148px;
+}
+
+.fn-years {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  opacity: 0.9;
+}
+
+.fn-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.fn-tag {
+  font-size: 0.57rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.fn-tag.tag-alive    { background: rgba(34,197,94,0.13);  color: #16a34a; }
+.fn-tag.tag-deceased { background: rgba(148,163,184,0.18); color: #64748b; }
+.fn-tag.tag-nasab    { /* color & bg set inline */ }
+
+.fn-occupation {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  margin-top: 1px;
+}
+
+/* ─── React Flow ──────────────────────────────────────── */
 .react-flow__edge-path {
   stroke: var(--edge-color);
   stroke-width: 2px;
@@ -421,7 +492,7 @@ body {
   background: var(--control-bg) !important;
   border: 1px solid var(--border-card) !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-  border-radius: 8px !important;
+  border-radius: 10px !important;
 }
 
 .react-flow__controls-button {
@@ -437,4 +508,340 @@ body {
 
 .react-flow__background {
   background-color: var(--bg-main);
+}
+
+/* ─── Redesigned Modal v2 ─────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+}
+
+.modal-container {
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 32px 64px -12px rgba(0,0,0,0.35) !important;
+  max-height: 92vh !important;
+  background: var(--bg-card);
+  width: 100%;
+  max-width: 680px;
+  border-radius: 24px;
+  border: 1px solid var(--border-card);
+  position: relative;
+}
+
+[data-theme='dark'] .modal-container { border-color: rgba(255,255,255,0.12); }
+
+/* Close button floating */
+.modal-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 20;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.25);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  backdrop-filter: blur(4px);
+}
+.modal-close-btn:hover { background: rgba(0,0,0,0.45); }
+
+/* Profile Hero */
+.modal-hero {
+  padding: 28px 28px 20px;
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.modal-hero-avatar {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.modal-hero-avatar img,
+.modal-hero-avatar .avatar-placeholder {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid rgba(255,255,255,0.75);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+
+.modal-hero-avatar .avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  background: rgba(255,255,255,0.2);
+}
+
+.modal-hero-avatar .hero-camera {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  background: var(--primary);
+  border: 2.5px solid white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+}
+
+.modal-hero-avatar .hero-status-dot {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2.5px solid white;
+}
+.hero-status-dot.alive    { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.6); }
+.hero-status-dot.deceased { background: #94a3b8; }
+
+.modal-hero-info {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 4px;
+}
+
+.modal-hero-info h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: white;
+  margin: 0 0 4px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  word-break: break-word;
+}
+
+.modal-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hero-meta-chip {
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  backdrop-filter: blur(4px);
+}
+
+.hero-meta-chip.alive    { background: rgba(34,197,94,0.35);  }
+.hero-meta-chip.deceased { background: rgba(148,163,184,0.35); }
+.hero-meta-chip.nasab    { background: rgba(255,255,255,0.18); }
+
+/* Modal Tabs */
+.modal-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-card);
+  background: var(--bg-header);
+  flex-shrink: 0;
+}
+
+.modal-tab-btn {
+  flex: 1;
+  padding: 13px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-bottom: 2.5px solid transparent;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.modal-tab-btn:hover { color: var(--text-main); background: rgba(0,0,0,0.03); }
+.modal-tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(99,102,241,0.04); }
+
+/* Modal Body */
+.modal-body {
+  padding: 24px !important;
+  overflow-y: auto !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 14px 20px !important;
+  border-top: 1px solid var(--border-card);
+  background: var(--bg-header);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Form Sections */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* Unified Input */
+.fi {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-card);
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-size: 0.88rem;
+  font-family: inherit;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.fi:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+.fi:read-only { opacity: 0.72; cursor: default; }
+.fi:read-only:focus { border-color: var(--border-card); box-shadow: none; }
+
+/* Spouse card */
+.spouse-card {
+  background: var(--bg-main);
+  border: 1.5px solid var(--border-card);
+  border-radius: 12px;
+  padding: 14px;
+  border-left: 3px solid var(--primary);
+}
+
+.spouse-card-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+/* Status toggle */
+.status-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1.5px solid;
+  transition: all 0.2s;
+}
+.status-toggle.alive    { background: rgba(34,197,94,0.04);  border-color: rgba(34,197,94,0.25); }
+.status-toggle.deceased { background: rgba(239,68,68,0.04);  border-color: rgba(239,68,68,0.2); }
+
+/* Address maps link */
+.maps-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(14,165,233,0.1);
+  color: #0ea5e9;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1.5px solid rgba(14,165,233,0.25);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.maps-btn:hover { background: rgba(14,165,233,0.18); }
+
+/* ─── Mobile overrides ────────────────────────────────── */
+@media (max-width: 768px) {
+  .modal-overlay { padding: 0; }
+
+  .modal-container {
+    width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none;
+  }
+
+  .modal-hero { padding: 22px 18px 16px; gap: 14px; }
+  .modal-hero-avatar img,
+  .modal-hero-avatar .avatar-placeholder { width: 68px; height: 68px; }
+  .modal-hero-info h2 { font-size: 1.15rem; }
+
+  .modal-body { padding: 16px !important; }
+
+  .form-grid { grid-template-columns: 1fr !important; gap: 12px; }
+  .spouse-card-grid { grid-template-columns: 1fr !important; gap: 10px; }
+
+  .modal-footer { flex-direction: column-reverse; }
+  .modal-footer .btn { width: 100%; justify-content: center; padding: 14px !important; }
+
+  .modal-tabs { overflow-x: auto; }
+  .modal-tab-btn { font-size: 0.75rem; padding: 11px 8px; white-space: nowrap; }
 }
