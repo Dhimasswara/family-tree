@@ -80,6 +80,45 @@ const nodeTypes = {
   union: UnionNode
 };
 
+// Helper: hitung urutan kelahiran & info saudara
+const getSiblingInfo = (member, allMembers) => {
+  const hasFather = !!member.fatherId;
+  const hasMother = !!member.motherId;
+  if (!hasFather && !hasMother) return null;
+
+  const allChildren = allMembers
+    .filter(m =>
+      (hasFather && m.fatherId === member.fatherId) ||
+      (hasMother && m.motherId === member.motherId)
+    )
+    .sort((a, b) => {
+      if (!a.birth) return 1;
+      if (!b.birth) return -1;
+      return new Date(a.birth) - new Date(b.birth);
+    });
+
+  const myIndex = allChildren.findIndex(m => m.id === member.id);
+  if (myIndex === -1) return null;
+  const total = allChildren.length;
+  const order = myIndex + 1;
+
+  return {
+    order,
+    total,
+    olderSiblings: allChildren.slice(0, myIndex),
+    youngerSiblings: allChildren.slice(myIndex + 1),
+  };
+};
+
+const getNasabLabel = (member, allMembers) => {
+  const info = getSiblingInfo(member, allMembers);
+  if (!info) return null;
+  if (info.total === 1) return 'Anak Tunggal';
+  if (info.order === 1) return `Sulung · 1 dari ${info.total}`;
+  if (info.order === info.total) return `Bungsu · ${info.order} dari ${info.total}`;
+  return `Anak ke-${info.order} dari ${info.total}`;
+};
+
 // Komponen Login Modal
 const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [email, setEmail] = useState('');
@@ -847,7 +886,7 @@ const App = () => {
     const nodes = sortedMembers.map((m) => ({
       id: m.id,
       type: 'familyMember',
-      data: { ...m },
+      data: { ...m, nasabLabel: getNasabLabel(m, sortedMembers) },
       position: { x: 0, y: 0 },
     }));
 
@@ -1918,6 +1957,7 @@ const App = () => {
                         )}
                         <th style={{ padding: '12px', textAlign: 'left' }}>Anggota</th>
                         <th style={{ padding: '12px', textAlign: 'left' }}>Orang Tua</th>
+                        <th style={{ padding: '12px', textAlign: 'left' }}>Urutan & Saudara</th>
                         <th style={{ padding: '12px', textAlign: 'left' }}>Status</th>
                         <th style={{ padding: '12px', textAlign: 'right' }}>Aksi</th>
                       </tr>
@@ -1953,6 +1993,37 @@ const App = () => {
                         <td style={{ padding: '12px', fontSize: '0.8rem' }}>
                           <div>A: {familyMembers.find(f => f.id === m.fatherId)?.name || '-'}</div>
                           <div>I: {familyMembers.find(f => f.id === m.motherId)?.name || '-'}</div>
+                        </td>
+                        <td style={{ padding: '12px', fontSize: '0.8rem' }}>
+                          {(() => {
+                            const info = getSiblingInfo(m, familyMembers);
+                            if (!info) return <span style={{ opacity: 0.4 }}>—</span>;
+                            const nasabLabel = getNasabLabel(m, familyMembers);
+                            const isMale = m.gender === 'male';
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={{
+                                  fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', width: 'fit-content',
+                                  background: isMale ? 'rgba(14,165,233,0.12)' : 'rgba(219,39,119,0.12)',
+                                  color: isMale ? '#0369a1' : '#be185d',
+                                }}>
+                                  {nasabLabel}
+                                </span>
+                                {info.olderSiblings.length > 0 && (
+                                  <div style={{ opacity: 0.75 }}>
+                                    <span style={{ fontWeight: 600 }}>Kakak: </span>
+                                    {info.olderSiblings.map(s => s.name).join(', ')}
+                                  </div>
+                                )}
+                                {info.youngerSiblings.length > 0 && (
+                                  <div style={{ opacity: 0.75 }}>
+                                    <span style={{ fontWeight: 600 }}>Adik: </span>
+                                    {info.youngerSiblings.map(s => s.name).join(', ')}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td style={{ padding: '12px' }}>
                           <span style={{ fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px', background: m.death ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)', color: m.death ? '#ef4444' : '#22c55e' }}>

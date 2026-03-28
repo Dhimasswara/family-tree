@@ -60,6 +60,21 @@ const FamilyMemberNode = ({ data }) => {
                         {data.birth && !isNaN(new Date(data.birth).getFullYear()) ? new Date(data.birth).getFullYear() : '?'}
                         {data.death && !isNaN(new Date(data.death).getFullYear()) ? ` - ${new Date(data.death).getFullYear()}` : ''}
                     </div>
+                    {data.nasabLabel && (
+                        <div style={{
+                            marginTop: '4px',
+                            fontSize: '0.65rem',
+                            fontWeight: 600,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: isMale ? 'rgba(14,165,233,0.15)' : 'rgba(219,39,119,0.15)',
+                            color: isMale ? '#0369a1' : '#be185d',
+                            display: 'inline-block',
+                            letterSpacing: '0.02em',
+                        }}>
+                            {data.nasabLabel}
+                        </div>
+                    )}
                 </div>
             </div>
 
