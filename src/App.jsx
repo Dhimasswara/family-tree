@@ -509,10 +509,15 @@ const App = () => {
       setLoading(false);
       return;
     }
+    if (!currentFamily?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('family_members')
-        .select('*');
+        .select('*')
+        .eq('family_id', currentFamily.id);
 
       if (error) throw error;
 
@@ -525,43 +530,15 @@ const App = () => {
         }));
         setFamilyMembers(mappedData);
       } else {
-        // Jika DB kosong, migrasikan data awal (localStorage atau initialData)
-        const currentData = JSON.parse(localStorage.getItem('familyData') || '[]');
-        const toUpload = currentData;
-        
-        if (toUpload.length > 0 && user) {
-          const { error: insertError } = await supabase
-            .from('family_members')
-            .upsert(toUpload.map(m => ({
-              id: m.id,
-              name: m.name,
-              gender: m.gender,
-              birth: m.birth,
-              death: m.death,
-              photo: m.photo,
-              father_id: m.fatherId || '',
-              mother_id: m.motherId || '',
-              spouses: m.spouses || [],
-              address: m.address || '',
-              occupation: m.occupation || '',
-              education: m.education || '',
-              phone: m.phone || '',
-              notes: m.notes || '',
-            })));
-          
-          if (insertError) console.error('Gagal migrasi data:', insertError);
-          setFamilyMembers(toUpload);
-        } else {
-          // Jika DB kosong dan belum login, tampilkan data lokal saja
-          setFamilyMembers(toUpload);
-        }
+        // Jika DB kosong untuk keluarga ini, mulai dari kosong
+        setFamilyMembers([]);
       }
     } catch (err) {
       console.error('Error fetching from Supabase:', err);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, currentFamily]);
 
   useEffect(() => {
     fetchData();
@@ -578,7 +555,7 @@ const App = () => {
         }
 
         const syncToSupabase = async () => {
-            if (!supabase) return;
+            if (!supabase || !currentFamily?.id) return;
             try {
                 const { error } = await supabase
                     .from('family_members')
@@ -591,9 +568,15 @@ const App = () => {
                         photo: m.photo,
                         father_id: m.fatherId || '',
                         mother_id: m.motherId || '',
-                        spouses: m.spouses || []
+                        spouses: m.spouses || [],
+                        address: m.address || '',
+                        occupation: m.occupation || '',
+                        education: m.education || '',
+                        phone: m.phone || '',
+                        notes: m.notes || '',
+                        family_id: currentFamily.id,
                     })));
-                
+
                 if (error) console.error('Gagal auto-sync ke Supabase:', error);
             } catch (err) {
                 console.error('Error in sync logic:', err);
@@ -1800,11 +1783,11 @@ const App = () => {
       localStorage.setItem('familyData', '[]');
       localStorage.removeItem('familyAppConfig');
       
-      // Hapus data di Supabase (Semua data di tabel)
+      // Hapus data di Supabase (hanya data keluarga ini)
       const { error } = await supabase
         .from('family_members')
         .delete()
-        .neq('id', '0'); // Di Postgres Supabase, delete harus pakai filter. neq '0' akan menghapus semua ID teks.
+        .eq('family_id', currentFamily?.id);
 
       if (error) console.error('Gagal reset di Supabase:', error);
 
