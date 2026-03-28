@@ -593,8 +593,8 @@ const App = () => {
     dagreGraph.setDefaultEdgeLabel(() => ({}));
     
     // Sesuaikan parameter tinggi Box dengan render asli untuk mencegah jarak yang terlalu ngangkang
-    const nodeWidth = 172;
-    const nodeHeight = 160;
+    const nodeWidth = 152;
+    const nodeHeight = 145;
 
     const spacingX = nodeWidth + 80; // Standard Dagre nodesep
     
@@ -1189,8 +1189,8 @@ const App = () => {
       const ys = sibPositions.map(n => n.position.y);
       const minX = Math.min(...xs) - PAD;
       const minY = Math.min(...ys) - PAD;
-      const maxX = Math.max(...xs) + 172 + PAD; // 172 = nodeWidth
-      const maxY = Math.max(...ys) + 160 + PAD; // 160 = nodeHeight
+      const maxX = Math.max(...xs) + 152 + PAD; // 152 = nodeWidth
+      const maxY = Math.max(...ys) + 145 + PAD; // 145 = nodeHeight
 
       groupNodes.push({
         id: `group-${groupKey}`,
@@ -1847,87 +1847,123 @@ const App = () => {
 
   return (
     <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
-      <header className="glass" style={{ margin: '20px', padding: '15px 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+      {/* ── Slim Navbar ── */}
+      <header className="app-navbar">
+        {/* Left: Logo */}
+        <div className="navbar-brand">
           {appConfig.logoMode === 'url' && appConfig.logoUrl ? (
-            <img src={appConfig.logoUrl} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} alt="Logo" />
+            <img src={appConfig.logoUrl} className="navbar-logo-img" alt="Logo" />
           ) : (
-            <div className="logo glass" style={{ padding: '10px', borderRadius: '12px', background: 'var(--primary)', color: 'white' }}>
-              <Users size={24} />
+            <div className="navbar-logo-icon">
+              <Trees size={18} color="white" />
             </div>
           )}
           <div>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700 }}>{appConfig.appName}</h1>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{appConfig.tagline}</p>
+            <div className="navbar-title">{appConfig.appName}</div>
+            <div className="navbar-sub">{currentFamily?.name || appConfig.tagline}</div>
           </div>
         </div>
 
-        <div style={{ flex: 1 }} />
+        {/* Center: View switcher */}
+        <div className="navbar-views">
+          <button className={`nav-pill ${view === 'tree' ? 'active' : ''}`} onClick={() => setView('tree')}>
+            <Trees size={14} /> Pohon
+          </button>
+          <button className={`nav-pill ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>
+            <TableIcon size={14} /> Tabel
+          </button>
+        </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} className="nav-container">
-          <button className="btn glass" onClick={toggleTheme} title="Tema">
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+        {/* Right: Actions */}
+        <div className="navbar-actions">
+          <button className="navbar-icon-btn" onClick={toggleTheme} title="Tema">
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
-          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.05)', padding: '4px', borderRadius: '10px', gap: '4px' }}>
-            <button className={`btn ${view === 'tree' ? 'btn-primary' : 'glass'}`} onClick={() => setView('tree')} style={{ padding: '8px 12px' }}>
-              <Trees size={16} /> <span className="btn-text">Pohon</span>
-            </button>
-            <button className={`btn ${view === 'table' ? 'btn-primary' : 'glass'}`} onClick={() => setView('table')} style={{ padding: '8px 12px' }}>
-              <TableIcon size={16} /> <span className="btn-text">Tabel</span>
-            </button>
-          </div>
-          <button className="btn glass" onClick={() => {
-            if (!planConfig.features.kinship) {
-              alert('Fitur Kalkulator Nasab tersedia di paket Starter ke atas. Hubungi admin untuk upgrade.');
-              return;
-            }
+          <button className="navbar-icon-btn" style={{ color: 'var(--primary)' }} onClick={() => {
+            if (!planConfig.features.kinship) { alert('Fitur Kalkulator Nasab tersedia di paket Starter ke atas.'); return; }
             setShowKinshipModal(true);
-          }} style={{ color: 'var(--primary)' }}>
-            <Users size={18} /> <span className="btn-text">Kalkulator</span>
+          }} title="Kalkulator Nasab">
+            <Divide size={16} />
           </button>
-          
+
           {familyUser ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--primary-light)', padding: '5px 12px', borderRadius: '12px', border: '1px solid rgba(217,119,6,0.2)' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', flexShrink: 0 }}>
-                <User size={14} />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{familyUser.name}</div>
-                <div style={{ fontSize: '0.58rem', color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase' }}>Anggota Keluarga</div>
-              </div>
-              <button className="btn glass" onClick={() => setFamilyUser(null)} style={{ padding: '5px', minWidth: 'auto', border: 'none', background: 'transparent' }} title="Keluar">
-                <LogOut size={14} style={{ color: 'var(--danger)' }} />
-              </button>
+            <div className="navbar-user-chip">
+              <div className="navbar-user-avatar"><User size={12} /></div>
+              <span>{familyUser.name}</span>
+              <button className="navbar-icon-btn" onClick={() => setFamilyUser(null)} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
             </div>
           ) : !user && (
-            <button className="btn glass" onClick={() => setShowFamilyLoginModal(true)} style={{ color: 'var(--primary)', borderColor: 'rgba(217,119,6,0.25)' }}>
-              <Key size={16} /> <span className="btn-text">Masuk Keluarga</span>
+            <button className="navbar-icon-btn" style={{ color: 'var(--primary)' }} onClick={() => setShowFamilyLoginModal(true)} title="Masuk Keluarga">
+              <Key size={16} />
             </button>
           )}
+
           {user ? (
-            <div className="user-badge" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '12px', marginLeft: '10px' }}>
-                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 600, maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
-                  <span style={{ 
-                    fontSize: '0.55rem', 
-                    fontWeight: 800,
-                    color: userRole === 'super_admin' ? '#0ea5e9' : 'var(--text-muted)',
-                    textTransform: 'uppercase',
-                  }}>
-                    {user.email === 'hello@admin.com' ? 'SUPER ADMIN' : (userRole || 'PELANGGAN')}
-                  </span>
-                </div>
-                <button className="btn glass" onClick={handleLogout} style={{ padding: '6px', minWidth: 'auto', border: 'none', background: 'transparent' }} title="Keluar">
-                  <LogOut size={16} style={{ color: '#ef4444' }} />
-                </button>
+            <div className="navbar-user-chip">
+              <div className="navbar-user-avatar" style={{ background: 'linear-gradient(135deg,#0ea5e9,#6366f1)' }}>
+                <ShieldCheck size={12} />
+              </div>
+              <span>{user.email?.split('@')[0]}</span>
+              <button className="navbar-icon-btn" onClick={handleLogout} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
             </div>
-          ) : (
-            <button className="btn btn-primary" onClick={() => setShowLoginModal(true)}>
-              <LogIn size={18} /> <span className="btn-text">Login</span>
+          ) : !familyUser && (
+            <button className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '0.8rem' }} onClick={() => setAppPage('auth')}>
+              <LogIn size={14} /> Masuk
+            </button>
+          )}
+
+          {(userRole === 'super_admin' || userRole === 'admin') && (
+            <button className={`navbar-icon-btn ${view === 'settings' ? 'active' : ''}`} onClick={() => setView(view === 'settings' ? 'tree' : 'settings')} title="Pengaturan">
+              <Settings size={16} />
             </button>
           )}
         </div>
       </header>
+
+      {/* ── Stats Ribbon ── */}
+      {(() => {
+        const total = familyMembers.length;
+        const alive = familyMembers.filter(m => !m.death).length;
+        const cities = new Set(familyMembers.map(m => {
+          if (!m.address) return null;
+          const parts = m.address.split(',').map(p => p.trim()).filter(Boolean);
+          return parts[parts.length - 1] || null;
+        }).filter(Boolean)).size;
+        const calcGen = () => {
+          if (!total) return 0;
+          const depth = {};
+          familyMembers.forEach(m => { if (!m.fatherId && !m.motherId) depth[m.id] = 1; });
+          let changed = true;
+          while (changed) {
+            changed = false;
+            familyMembers.forEach(m => {
+              if (depth[m.id]) return;
+              const p = (m.fatherId && depth[m.fatherId]) || (m.motherId && depth[m.motherId]);
+              if (p) { depth[m.id] = p + 1; changed = true; }
+            });
+          }
+          const vals = Object.values(depth);
+          return vals.length ? Math.max(...vals) : 1;
+        };
+        const gens = calcGen();
+        const stats = [
+          { label: 'Total', value: total, color: '#6366f1', bg: 'rgba(99,102,241,0.1)', icon: '👥' },
+          { label: 'Hidup', value: alive, color: '#059669', bg: 'rgba(5,150,105,0.1)', icon: '💚' },
+          { label: 'Kota', value: cities, color: '#d97706', bg: 'rgba(217,119,6,0.1)', icon: '🏙️' },
+          { label: 'Generasi', value: gens, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)', icon: '🌳' },
+        ];
+        return (
+          <div className="stats-ribbon">
+            {stats.map(s => (
+              <div key={s.label} className="stat-chip" style={{ background: s.bg, border: `1px solid ${s.color}22` }}>
+                <span className="stat-icon">{s.icon}</span>
+                <span className="stat-value" style={{ color: s.color }}>{s.value}</span>
+                <span className="stat-label">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       {!supabase && (
         <div style={{ background: '#fef2f2', color: '#ef4444', padding: '10px 30px', margin: '0 20px 20px', borderRadius: '12px', border: '1px solid #fee2e2', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', zIndex: 1000, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <ShieldCheck size={18} />
@@ -1937,19 +1973,7 @@ const App = () => {
 
       <main style={{ flex: 1, position: 'relative', overflowY: view !== 'tree' ? 'auto' : 'hidden' }}>
         
-        {/* Tombol Pengaturan Mengambang di Pojok (Hanya Admin) */}
-        {(userRole === 'super_admin' || userRole === 'admin') && (
-          <button 
-            className={`btn settings-btn ${view === 'settings' ? 'btn-primary' : 'glass'}`} 
-            style={{ position: 'fixed', bottom: '20px', right: '20px', padding: '12px', zIndex: 9999, borderRadius: '50%', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
-            onClick={() => setView(view === 'settings' ? 'tree' : 'settings')} 
-            title="Pengaturan"
-          >
-            <Settings size={28} />
-          </button>
-        )}
-
-        <AnimatePresence mode="wait">
+<AnimatePresence mode="wait">
           {view === 'tree' ? (
             <motion.div key="tree" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: '100%', height: '100%' }}>
               <ReactFlow
