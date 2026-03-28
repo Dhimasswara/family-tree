@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapPin, Users, X } from 'lucide-react';
+import { MapPin, X } from 'lucide-react';
+
+const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS  = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
 const extractCity = (address) => {
   if (!address) return null;
@@ -26,42 +29,55 @@ const geocodeCity = async (city) => {
   return null;
 };
 
+// Load a script/link tag once and resolve when ready
+const loadResource = (type, url, id) => new Promise((resolve) => {
+  if (document.getElementById(id)) { resolve(); return; }
+  const el = document.createElement(type === 'script' ? 'script' : 'link');
+  el.id = id;
+  if (type === 'script') {
+    el.src = url;
+    el.onload = resolve;
+  } else {
+    el.rel = 'stylesheet';
+    el.href = url;
+    el.onload = resolve;
+  }
+  document.head.appendChild(el);
+});
+
 const MapView = ({ familyMembers, onClose }) => {
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
+  const mapRef        = useRef(null);
+  const mapInstance   = useRef(null);
+  const [loading, setLoading]       = useState(true);
+  const [progress, setProgress]     = useState(0);
   const [markerCount, setMarkerCount] = useState(0);
 
   const membersWithCity = familyMembers.filter(m => extractCity(m.address));
-  const membersNoCity = familyMembers.length - membersWithCity.length;
+  const membersNoCity   = familyMembers.length - membersWithCity.length;
 
   useEffect(() => {
-    // Dynamically load Leaflet CSS
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
+    let cancelled = false;
 
-    const initMap = async () => {
-      // Dynamically import Leaflet
-      const L = (await import('leaflet')).default;
+    const run = async () => {
+      // Load Leaflet from CDN (no npm package needed)
+      await Promise.all([
+        loadResource('link',   LEAFLET_CSS, 'leaflet-css'),
+        loadResource('script', LEAFLET_JS,  'leaflet-js'),
+      ]);
+      if (cancelled || !mapRef.current || mapInstance.current) return;
 
-      // Fix default icon
+      const L = window.L;
+
+      // Fix default icon paths
       delete L.Icon.Default.prototype._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       });
 
-      if (!mapRef.current || mapInstanceRef.current) return;
-
       const map = L.map(mapRef.current).setView([-2.5, 118], 5);
-      mapInstanceRef.current = map;
+      mapInstance.current = map;
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -76,70 +92,55 @@ const MapView = ({ familyMembers, onClose }) => {
         cityMap[city].push(m);
       });
 
-      const cities = Object.keys(cityMap);
+      const cities  = Object.keys(cityMap);
       const results = [];
 
       for (let i = 0; i < cities.length; i++) {
+        if (cancelled) return;
         const city = cities[i];
         setProgress(Math.round(((i + 1) / cities.length) * 100));
         const coords = await geocodeCity(city);
-        if (coords) {
-          results.push({ ...coords, city, members: cityMap[city] });
-        }
+        if (coords) results.push({ ...coords, city, members: cityMap[city] });
         if (i < cities.length - 1) await new Promise(r => setTimeout(r, 1100));
       }
 
-      // Add markers
+      if (cancelled) return;
+
       results.forEach(m => {
-        const memberList = m.members.slice(0, 5)
-          .map(mem => `
-            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #f1f5f9">
-              <div style="width:20px;height:20px;border-radius:50%;background:${mem.gender === 'male' ? '#e0f2fe' : '#fce7f3'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px">
-                ${mem.gender === 'male' ? '♂' : '♀'}
-              </div>
-              <span style="font-size:0.8rem;font-weight:600;color:#1c1917">${mem.name}</span>
-              ${mem.death ? '<span style="font-size:0.65rem;color:#94a3b8;margin-left:auto">†</span>' : ''}
-            </div>
-          `).join('');
+        const memberRows = m.members.slice(0, 5).map(mem => `
+          <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #f1f5f9">
+            <span style="font-size:12px">${mem.gender === 'male' ? '♂' : '♀'}</span>
+            <span style="font-size:0.8rem;font-weight:600;color:#1c1917">${mem.name}</span>
+            ${mem.death ? '<span style="font-size:0.65rem;color:#94a3b8;margin-left:auto">†</span>' : ''}
+          </div>`).join('');
 
         const extra = m.members.length > 5
           ? `<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">+${m.members.length - 5} lainnya</div>`
           : '';
 
-        const popup = L.popup().setContent(`
+        L.marker([m.lat, m.lng]).addTo(map).bindPopup(`
           <div style="font-family:Outfit,sans-serif;min-width:160px">
-            <div style="font-weight:800;font-size:0.95rem;margin-bottom:8px;color:#1c1917;display:flex;align-items:center;gap:6px">
-              📍 ${m.city}
-            </div>
+            <div style="font-weight:800;font-size:0.95rem;margin-bottom:8px;color:#1c1917">📍 ${m.city}</div>
             <div style="font-size:0.78rem;color:#78716c;margin-bottom:6px">${m.members.length} anggota keluarga</div>
-            ${memberList}
-            ${extra}
-          </div>
-        `);
-
-        L.marker([m.lat, m.lng]).addTo(map).bindPopup(popup);
+            ${memberRows}${extra}
+          </div>`);
       });
 
       setMarkerCount(results.length);
 
-      // Fit bounds
       if (results.length === 1) {
         map.setView([results[0].lat, results[0].lng], 10);
       } else if (results.length > 1) {
-        const bounds = L.latLngBounds(results.map(r => [r.lat, r.lng]));
-        map.fitBounds(bounds, { padding: [40, 40] });
+        map.fitBounds(L.latLngBounds(results.map(r => [r.lat, r.lng])), { padding: [40, 40] });
       }
 
       setLoading(false);
     };
 
-    initMap();
-
+    run();
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
+      cancelled = true;
+      if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; }
     };
   }, []);
 
@@ -153,21 +154,20 @@ const MapView = ({ familyMembers, onClose }) => {
         <div>
           <div style={{ fontWeight: 800, fontSize: '1rem' }}>Peta Persebaran Keluarga</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-            {loading ? `Memuat lokasi... ${progress}%` : `${markerCount} kota · ${membersWithCity.length} anggota terpetakan${membersNoCity > 0 ? ` · ${membersNoCity} belum punya alamat` : ''}`}
+            {loading
+              ? `Memuat lokasi... ${progress}%`
+              : `${markerCount} kota · ${membersWithCity.length} anggota terpetakan${membersNoCity > 0 ? ` · ${membersNoCity} belum punya alamat` : ''}`}
           </div>
         </div>
-        <button
-          onClick={onClose}
-          style={{ marginLeft: 'auto', width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border-card)', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
-        >
+        <button onClick={onClose} style={{ marginLeft: 'auto', width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border-card)', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
           <X size={16} />
         </button>
       </div>
 
-      {/* Map */}
+      {/* Map container */}
       <div style={{ flex: 1, position: 'relative' }}>
         {loading && (
-          <div style={{ position: 'absolute', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
             <div style={{ color: 'white', fontWeight: 700, fontSize: '1rem' }}>Memuat lokasi... {progress}%</div>
             <div style={{ width: 200, height: 6, background: 'rgba(255,255,255,0.2)', borderRadius: 3 }}>
               <div style={{ width: `${progress}%`, height: '100%', background: '#38bdf8', borderRadius: 3, transition: 'width 0.3s' }} />
@@ -180,7 +180,7 @@ const MapView = ({ familyMembers, onClose }) => {
 
       {!loading && markerCount === 0 && (
         <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-          <MapPin size={32} style={{ opacity: 0.3, marginBottom: 8, display: 'block', margin: '0 auto 8px' }} />
+          <MapPin size={32} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />
           Belum ada anggota dengan alamat lengkap.<br />Tambahkan alamat di profil anggota.
         </div>
       )}
