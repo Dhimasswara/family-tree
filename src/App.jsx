@@ -434,7 +434,7 @@ const App = () => {
     }
   };
 
-  // Restore family + role on session resume
+  // Restore family + role on session resume (page refresh)
   const restoreSession = useCallback(async (u) => {
     if (!u || !supabase) return;
     fetchUserRole(u.id);
@@ -446,7 +446,9 @@ const App = () => {
         .eq('admin_id', u.id)
         .single();
       if (fam) {
-        setCurrentFamily(fam);
+        // Gunakan functional updater — hanya update jika family ID berbeda
+        // supaya tidak trigger fetchData dua kali saat login baru (onLoginSuccess sudah set ini)
+        setCurrentFamily(prev => (prev?.id === fam.id ? prev : fam));
         setUserPlan(fam.plan || 'free');
       }
     } catch (_) {}
@@ -1239,11 +1241,11 @@ const App = () => {
     // 1. Ambil ID pasangan untuk keperluan sync
     const oldMember = familyMembers.find(m => m.id === editingId);
     const oldSpouseIds = oldMember?.spouses?.map(s => s.id) || [];
-    const newSpouseIds = editBuffer.spouses?.map(s => s.id) || [];
 
     // 2. Update state lokal (Complex logic untuk sinkronisasi 2 arah spouse)
+    let updatedMembers;
     setFamilyMembers(prev => {
-      return prev.map(m => {
+      updatedMembers = prev.map(m => {
         if (m.id === editingId) return { ...editBuffer };
 
         let mSpouses = [...(m.spouses || [])];
@@ -1254,10 +1256,10 @@ const App = () => {
         if (spouseInfoInEditBuffer) {
             const existingEntry = mSpouses.find(s => s.id === editingId);
             if (!existingEntry) {
-                mSpouses.push({ 
-                    id: editingId, 
-                    type: spouseInfoInEditBuffer.type || 'married', 
-                    marriageDate: spouseInfoInEditBuffer.marriageDate || '' 
+                mSpouses.push({
+                    id: editingId,
+                    type: spouseInfoInEditBuffer.type || 'married',
+                    marriageDate: spouseInfoInEditBuffer.marriageDate || ''
                 });
                 hasChanged = true;
             } else {
@@ -1282,7 +1284,32 @@ const App = () => {
         if (hasChanged) return { ...m, spouses: mSpouses };
         return m;
       });
+      return updatedMembers;
     });
+
+    // 3. Langsung save ke Supabase (tidak hanya mengandalkan useEffect)
+    if (supabase && currentFamily?.id && user) {
+      const toSave = { ...editBuffer };
+      supabase.from('family_members').upsert({
+        id: toSave.id,
+        name: toSave.name,
+        gender: toSave.gender,
+        birth: toSave.birth || null,
+        death: toSave.death || null,
+        photo: toSave.photo || '',
+        father_id: toSave.fatherId || '',
+        mother_id: toSave.motherId || '',
+        spouses: toSave.spouses || [],
+        address: toSave.address || '',
+        occupation: toSave.occupation || '',
+        education: toSave.education || '',
+        phone: toSave.phone || '',
+        notes: toSave.notes || '',
+        family_id: currentFamily.id,
+      }).then(({ error }) => {
+        if (error) console.error('Gagal simpan anggota:', error);
+      });
+    }
 
     setEditingId(null);
   };
