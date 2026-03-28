@@ -355,6 +355,7 @@ const App = () => {
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const isInitialLoad = useRef(true);
+  const currentFamilyRef = useRef(null); // stable ref to avoid stale closure in saveGallery
   
   // Auth & Roles States
   const [user, setUser] = useState(null);
@@ -370,6 +371,7 @@ const App = () => {
   const [globalPin, setGlobalPin] = useState('');
   const [showMapView, setShowMapView] = useState(false);
   const [straightEdges, setStraightEdges] = useState(false);
+  const [layoutKey, setLayoutKey] = useState(0); // increment to force re-layout
   const rfRef = useRef(null);
   const [galleryPosts, setGalleryPosts] = useState([]);
   // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
@@ -636,6 +638,9 @@ const App = () => {
     fetchData();
   }, [fetchData]);
 
+  // Keep ref in sync with state
+  useEffect(() => { currentFamilyRef.current = currentFamily; }, [currentFamily]);
+
   // Load gallery dari Supabase (kolom JSON di families)
   useEffect(() => {
     if (!supabase || !currentFamily?.id) return;
@@ -643,12 +648,15 @@ const App = () => {
       .then(({ data }) => { if (data?.gallery) setGalleryPosts(data.gallery); });
   }, [currentFamily?.id]);
 
+  // Stable saveGallery — uses ref to avoid stale closure, so family member posts persist
   const saveGallery = useCallback(async (posts) => {
     setGalleryPosts(posts);
-    if (supabase && currentFamily?.id) {
-      await supabase.from('families').update({ gallery: posts }).eq('id', currentFamily.id);
+    const fam = currentFamilyRef.current;
+    if (supabase && fam?.id) {
+      const { error } = await supabase.from('families').update({ gallery: posts }).eq('id', fam.id);
+      if (error) console.error('Gagal simpan galeri:', error.message);
     }
-  }, [currentFamily?.id]);
+  }, []);
 
   useEffect(() => {
     // Auto-sync ke Supabase: HANYA jika User Login
@@ -810,7 +818,8 @@ const App = () => {
         }
     });
 
-    dagreGraph.setGraph({ rankdir: 'TB', ranksep: 90, nodesep: 50 });
+    const isRapih = layoutKey > 0;
+    dagreGraph.setGraph({ rankdir: 'TB', ranksep: isRapih ? 110 : 90, nodesep: isRapih ? 70 : 50, align: isRapih ? 'UL' : undefined });
 
     const getTotalSpouseCount = (id, visited = new Set()) => {
         if (visited.has(id)) return 0;
@@ -1341,7 +1350,7 @@ const App = () => {
     });
 
     return { layoutedNodes: [...groupNodes, ...computedNodes], layoutedEdges: edges };
-  }, [familyMembers]);
+  }, [familyMembers, layoutKey]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -2174,7 +2183,12 @@ const App = () => {
                   <button
                     className="tree-panel-btn"
                     title={straightEdges ? 'Garis Lengkung' : 'Rapihkan Garis'}
-                    onClick={() => { setStraightEdges(p => !p); setTimeout(() => rfRef.current?.fitView({ duration: 500 }), 50); }}
+                    onClick={() => {
+                      const next = !straightEdges;
+                      setStraightEdges(next);
+                      if (next) setLayoutKey(k => k + 1); // force fresh dagre layout
+                      setTimeout(() => rfRef.current?.fitView({ duration: 600, padding: 0.15 }), 80);
+                    }}
                     style={{ background: straightEdges ? 'var(--primary)' : 'var(--bg-card)', color: straightEdges ? 'white' : 'var(--text-main)', border: '1px solid var(--border-card)', borderRadius: 9, padding: '7px 12px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', fontFamily: 'Outfit, sans-serif', whiteSpace: 'nowrap' }}
                   >
                     ↔ {straightEdges ? 'Lurus' : 'Rapihkan'}
