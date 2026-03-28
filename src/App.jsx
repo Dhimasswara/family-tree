@@ -25,6 +25,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
 import Cropper from 'react-easy-crop';
+import LandingPage from './pages/LandingPage';
+import AuthPage from './pages/AuthPage';
+import { getPlanConfig } from './config/plans';
 
 // Error Boundary sederhana untuk menangkap crash
 class ErrorBoundary extends React.Component {
@@ -390,8 +393,20 @@ const App = () => {
   // Family Member Login (PIN-based)
   const [familyUser, setFamilyUser] = useState(null);
   const [showFamilyLoginModal, setShowFamilyLoginModal] = useState(false);
-  // PIN edit buffer for settings
   const [pinBuffers, setPinBuffers] = useState({});
+  // Page routing: 'landing' | 'auth' | 'app'
+  const [appPage, setAppPage] = useState('landing');
+  // Current family data (for multi-tenant)
+  const [currentFamily, setCurrentFamily] = useState(null);
+  const [userPlan, setUserPlan] = useState('free');
+
+  const planConfig = getPlanConfig(userPlan);
+  const canAddMember = familyMembers.length < planConfig.maxMembers;
+
+  // Auto-navigate to app when auth resolves
+  useEffect(() => {
+    if (user || familyUser) setAppPage('app');
+  }, [user, familyUser]);
 
   const fetchUserRole = useCallback(async (userId) => {
     if (!supabase) return;
@@ -482,7 +497,10 @@ const App = () => {
     if (supabase) await supabase.auth.signOut();
     setUser(null);
     setUserRole(null);
-    if (view === 'settings') setView('tree');
+    setFamilyUser(null);
+    setCurrentFamily(null);
+    setAppPage('landing');
+    setView('tree');
   };
 
   // Fungsi Fetch Data dari Supabase
@@ -1804,6 +1822,30 @@ const App = () => {
       window.location.reload();
   };
 
+  // Page routing
+  if (appPage === 'landing') {
+    return <LandingPage onNavigate={setAppPage} />;
+  }
+  if (appPage === 'auth') {
+    return (
+      <AuthPage
+        onNavigate={setAppPage}
+        onLoginSuccess={(u, family) => {
+          setUser(u);
+          if (family) { setCurrentFamily(family); setUserPlan(family.plan || 'free'); }
+          setAppPage('app');
+        }}
+        onFamilyLoginSuccess={(member, family) => {
+          setFamilyUser(member);
+          setCurrentFamily(family);
+          setAppPage('app');
+        }}
+        familyMembers={familyMembers}
+        setFamilyMembers={setFamilyMembers}
+      />
+    );
+  }
+
   return (
     <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
       <header className="glass" style={{ margin: '20px', padding: '15px 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 100 }}>
@@ -1835,7 +1877,13 @@ const App = () => {
               <TableIcon size={16} /> <span className="btn-text">Tabel</span>
             </button>
           </div>
-          <button className="btn glass" onClick={() => setShowKinshipModal(true)} style={{ color: 'var(--primary)' }}>
+          <button className="btn glass" onClick={() => {
+            if (!planConfig.features.kinship) {
+              alert('Fitur Kalkulator Nasab tersedia di paket Starter ke atas. Hubungi admin untuk upgrade.');
+              return;
+            }
+            setShowKinshipModal(true);
+          }} style={{ color: 'var(--primary)' }}>
             <Users size={18} /> <span className="btn-text">Kalkulator</span>
           </button>
           
@@ -2175,7 +2223,13 @@ const App = () => {
 
                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
                   {user && (
-                    <button className="btn btn-primary" onClick={handleAdd}>
+                    <button className="btn btn-primary" onClick={() => {
+                      if (!canAddMember) {
+                        alert(`Batas paket ${planConfig.name}: maks ${planConfig.maxMembers} anggota. Upgrade paket untuk menambah lebih banyak.`);
+                        return;
+                      }
+                      handleAdd();
+                    }}>
                       <Plus size={16} /> <span className="btn-text">Tambah Anggota</span>
                     </button>
                   )}
@@ -2701,14 +2755,20 @@ const App = () => {
                           placeholder="Jl. Merdeka No. 10, Jakarta Selatan"
                         />
                         {editBuffer.address && (
-                          <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(editBuffer.address)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="maps-btn"
-                          >
-                            <MapPin size={13} /> Maps
-                          </a>
+                          planConfig.features.maps ? (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(editBuffer.address)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="maps-btn"
+                            >
+                              <MapPin size={13} /> Maps
+                            </a>
+                          ) : (
+                            <button className="maps-btn" onClick={() => alert('Fitur Maps tersedia di paket Starter ke atas.')} style={{ cursor: 'pointer', border: 'none' }}>
+                              🔒 Maps
+                            </button>
+                          )
                         )}
                       </div>
                     </div>

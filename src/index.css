@@ -857,3 +857,14 @@ body {
   .modal-tabs { overflow-x: auto; }
   .modal-tab-btn { font-size: 0.75rem; padding: 11px 8px; white-space: nowrap; }
 }
+
+/* ─── Landing Page ─────────────────────────────── */
+@media (max-width: 768px) {
+  .desktop-only { display: none !important; }
+  .mobile-only  { display: flex !important; }
+}
+
+/* Ensure fi input works everywhere */
+textarea.fi { padding: 10px 14px; }
+select.fi { padding: 10px 14px; appearance: none; cursor: pointer; }
+select.fi:read-only { pointer-events: none; }
