@@ -20,7 +20,7 @@ import {
   Trash2, Edit2, Save, X, Camera, Heart, Baby, Sun, Moon, Search,
   Divide, Settings, Download, Upload, LogIn, LogOut, Lock, Unlock, ShieldCheck, UserCog,
   MapPin, Briefcase, GraduationCap, Phone, FileText,
-  Key, Crown, Star, Shield, ChevronDown
+  Key, Crown, Star, Shield, ChevronDown, Copy, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
@@ -1979,6 +1979,54 @@ const App = () => {
                   </div>
 
                   <hr style={{ borderColor: 'var(--border-card)', margin: '20px 0' }} />
+
+                  {/* Kode Keluarga */}
+                  {currentFamily && (
+                    <div className="glass" style={{ padding: '24px', marginBottom: '20px', border: '1px solid rgba(217,119,6,0.15)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Key size={18} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '1rem' }}>Kode Keluarga</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bagikan ke anggota untuk login. Jaga kerahasiaannya.</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ flex: 1, background: 'var(--bg-main)', border: '2px dashed var(--primary)', borderRadius: '12px', padding: '14px 20px', textAlign: 'center' }}>
+                          <span style={{ fontFamily: 'monospace', fontSize: '2rem', fontWeight: 800, letterSpacing: '0.3em', color: 'var(--primary)' }}>
+                            {currentFamily.code}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <button className="btn btn-primary" style={{ padding: '10px 14px', fontSize: '0.82rem', gap: 6 }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(currentFamily.code);
+                              alert('Kode disalin!');
+                            }}>
+                            <Copy size={14} /> Salin
+                          </button>
+                          <button className="btn glass" style={{ padding: '10px 14px', fontSize: '0.82rem', gap: 6 }}
+                            onClick={() => {
+                              const text = `Halo! Kamu diundang bergabung di pohon keluarga *${currentFamily.name}* di FamTree.\n\nKode Keluarga: *${currentFamily.code}*\n\nBuka app → Login Anggota → masukkan kode ini.`;
+                              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                            }}>
+                            <Share2 size={14} /> WhatsApp
+                          </button>
+                          <button className="btn glass" style={{ padding: '10px 14px', fontSize: '0.82rem', gap: 6, color: 'var(--danger)' }}
+                            title="Generate kode baru (kode lama tidak berlaku)"
+                            onClick={async () => {
+                              if (!confirm('Kode lama akan tidak berlaku. Lanjutkan?')) return;
+                              const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                              const { error } = await supabase.from('families').update({ code: newCode }).eq('id', currentFamily.id);
+                              if (!error) setCurrentFamily(prev => ({ ...prev, code: newCode }));
+                            }}>
+                            <RefreshCw size={14} /> Regenerate
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* PIN Management */}
                   <div className="glass" style={{ padding: '24px', marginBottom: '20px' }}>
