@@ -38,7 +38,16 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
     try {
       const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
       if (err) throw err;
-      onLoginSuccess(data.user);
+      const userId = data.user?.id;
+
+      // Fetch family for this admin
+      const { data: fam } = await supabase
+        .from('families')
+        .select('*')
+        .eq('admin_id', userId)
+        .single();
+
+      onLoginSuccess(data.user, fam || null);
     } catch (err) {
       setError(err.message || 'Email atau password salah.');
     } finally { setLoading(false); }
@@ -57,14 +66,13 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
       const userId = authData.user?.id;
       if (!userId) throw new Error('Gagal membuat akun.');
 
-      // 2. Create family record
+      // 2. Create family record via security-definer function (bypasses RLS during registration)
       const code = genCode();
-      const { data: familyData, error: famErr } = await supabase
-        .from('families')
-        .insert({ name: familyName.trim(), code, admin_id: userId, plan: 'free' })
-        .select()
-        .single();
+      const { data: familyRows, error: famErr } = await supabase
+        .rpc('create_family', { p_name: familyName.trim(), p_code: code });
       if (famErr) throw famErr;
+      const familyData = familyRows?.[0];
+      if (!familyData) throw new Error('Gagal membuat data keluarga.');
 
       // 3. Update profile with family_id and role
       await supabase.from('profiles').upsert({

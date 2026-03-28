@@ -1815,6 +1815,7 @@ const App = () => {
         onNavigate={setAppPage}
         onLoginSuccess={(u, family) => {
           setUser(u);
+          setUserRole('super_admin');
           if (family) { setCurrentFamily(family); setUserPlan(family.plan || 'free'); }
           setAppPage('app');
         }}
