@@ -8,6 +8,16 @@ const extractCity = (address) => {
   return parts[parts.length - 1] || null;
 };
 
+const getGeneration = (birthYear) => {
+  if (!birthYear || isNaN(birthYear)) return null;
+  if (birthYear >= 2013) return { label: 'Gen Alpha', color: '#7c3aed' };
+  if (birthYear >= 1997) return { label: 'Gen Z', color: '#0ea5e9' };
+  if (birthYear >= 1981) return { label: 'Milenial', color: '#059669' };
+  if (birthYear >= 1965) return { label: 'Gen X', color: '#d97706' };
+  if (birthYear >= 1946) return { label: 'Baby Boomer', color: '#dc2626' };
+  return { label: 'Silent Gen', color: '#64748b' };
+};
+
 const FamilyMemberNode = ({ data }) => {
   const isDeceased = !!data.death;
   const isMale = data.gender === 'male';
@@ -25,6 +35,7 @@ const FamilyMemberNode = ({ data }) => {
   const deathYear = data.death && !isNaN(new Date(data.death).getFullYear())
     ? new Date(data.death).getFullYear() : null;
   const city = extractCity(data.address);
+  const gen = getGeneration(parseInt(birthYear));
 
   return (
     <div className="fnc-wrap">
@@ -94,6 +105,11 @@ const FamilyMemberNode = ({ data }) => {
             {data.nasabLabel && (
               <span className="fnc-badge badge-nasab" style={{ color: accentDeep, background: `${accentDeep}18` }}>
                 {data.nasabLabel}
+              </span>
+            )}
+            {gen && (
+              <span className="fnc-badge" style={{ background: `${gen.color}18`, color: gen.color }}>
+                {gen.label}
               </span>
             )}
           </div>

@@ -1093,3 +1093,8 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
 .stat-icon { font-size: 0.95rem; line-height: 1; }
 .stat-value { font-size: 1.15rem; font-weight: 800; line-height: 1; }
 .stat-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); }
+
+/* ── Leaflet overrides ── */
+.leaflet-container { font-family: 'Outfit', sans-serif !important; }
+.leaflet-popup-content-wrapper { border-radius: 14px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important; }
+.leaflet-popup-content { margin: 12px 14px !important; }

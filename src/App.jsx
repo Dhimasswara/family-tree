@@ -27,6 +27,7 @@ import * as XLSX from 'xlsx';
 import Cropper from 'react-easy-crop';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
+import MapView from './pages/MapView';
 import { getPlanConfig, PLANS } from './config/plans';
 
 // Error Boundary sederhana untuk menangkap crash
@@ -365,6 +366,7 @@ const App = () => {
   const [showFamilyLoginModal, setShowFamilyLoginModal] = useState(false);
   const [pinBuffers, setPinBuffers] = useState({});
   const [globalPin, setGlobalPin] = useState('');
+  const [showMapView, setShowMapView] = useState(false);
   // View modal (klik node di tree)
   const [viewTarget, setViewTarget] = useState(null);
   // Page routing: 'landing' | 'auth' | 'app'
@@ -1149,9 +1151,23 @@ const App = () => {
       });
     });
 
-    // Set edge type smoothstep untuk semua edge agar terlihat lebih rapi
+    // Edge styling final
     edges.forEach(e => {
       if (!e.type) e.type = 'smoothstep';
+      // Spouse edges: solid amber with subtle label
+      if (e.id.startsWith('e-spouse-')) {
+        e.label = e.style?.strokeDasharray ? 'Cerai' : 'Menikah';
+        e.labelStyle = { fontSize: 9, fontWeight: 700, fontFamily: 'Outfit,sans-serif', fill: e.style?.strokeDasharray ? '#94a3b8' : '#d97706', background: 'transparent' };
+        e.labelBgStyle = { fill: 'transparent' };
+      }
+      // Child edges: dashed subtle
+      if (e.id.startsWith('e-child-') || e.id.startsWith('e-single-')) {
+        e.style = { ...e.style, strokeDasharray: '5,3', opacity: 0.75 };
+      }
+      // Union connector: very thin, nearly invisible
+      if (e.id.startsWith('e-union-')) {
+        e.style = { ...e.style, strokeDasharray: '3,3', opacity: 0.45 };
+      }
     });
 
     const finalNodes = [...nodes, ...unionNodes];
@@ -1883,6 +1899,9 @@ const App = () => {
           }} title="Kalkulator Nasab">
             <Divide size={16} />
           </button>
+          <button className="navbar-icon-btn" onClick={() => setShowMapView(true)} title="Peta Persebaran">
+            <MapPin size={16} />
+          </button>
 
           {familyUser ? (
             <div className="navbar-user-chip">
@@ -2574,6 +2593,11 @@ const App = () => {
         onLoginSuccess={(member) => setFamilyUser(member)}
         familyMembers={familyMembers}
       />
+
+      {/* ── Map View ── */}
+      {showMapView && (
+        <MapView familyMembers={familyMembers} onClose={() => setShowMapView(false)} />
+      )}
 
       {/* ── View Member Modal ── */}
       {viewTarget && (() => {
