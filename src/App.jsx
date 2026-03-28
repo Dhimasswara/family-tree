@@ -364,6 +364,9 @@ const App = () => {
   const [familyUser, setFamilyUser] = useState(null);
   const [showFamilyLoginModal, setShowFamilyLoginModal] = useState(false);
   const [pinBuffers, setPinBuffers] = useState({});
+  const [globalPin, setGlobalPin] = useState('');
+  // View modal (klik node di tree)
+  const [viewTarget, setViewTarget] = useState(null);
   // Page routing: 'landing' | 'auth' | 'app'
   const [appPage, setAppPage] = useState('landing');
   // Current family data (for multi-tenant)
@@ -1984,7 +1987,7 @@ const App = () => {
                 nodeTypes={nodeTypes}
                 onNodeClick={(_, node) => {
                   if (node.type === 'familyMember') {
-                    handleEdit(node.data);
+                    setViewTarget(familyMembers.find(m => m.id === node.data.id) || node.data);
                   }
                 }}
                 fitView
@@ -2081,7 +2084,7 @@ const App = () => {
 
                   {/* PIN Management */}
                   <div className="glass" style={{ padding: '24px', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                       <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Key size={18} />
                       </div>
@@ -2089,6 +2092,23 @@ const App = () => {
                         <div style={{ fontWeight: 700, fontSize: '1rem' }}>Kelola Akses Login Keluarga</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Set PIN untuk tiap anggota agar bisa login</div>
                       </div>
+                    </div>
+                    {/* Set PIN seragam */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', padding: '12px', background: 'var(--bg-main)', borderRadius: '10px', border: '1px solid var(--border-card)' }}>
+                      <input type="password" className="fi" placeholder="PIN seragam untuk semua anggota..." value={globalPin} onChange={e => setGlobalPin(e.target.value)} maxLength={20} style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem' }} />
+                      <button className="btn btn-primary" style={{ flexShrink: 0, padding: '8px 16px', fontSize: '0.82rem' }}
+                        disabled={!globalPin}
+                        onClick={async () => {
+                          if (!globalPin || !confirm(`Set PIN "${globalPin}" untuk semua ${familyMembers.length} anggota?`)) return;
+                          setFamilyMembers(prev => prev.map(m => ({ ...m, pin: globalPin })));
+                          if (supabase && currentFamily?.id) {
+                            await supabase.from('family_members').update({ pin: globalPin }).eq('family_id', currentFamily.id);
+                          }
+                          setGlobalPin('');
+                          alert('PIN seragam berhasil di-set!');
+                        }}>
+                        <Key size={13} /> Set Semua
+                      </button>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {familyMembers.sort((a,b) => a.name.localeCompare(b.name)).map(m => (
@@ -2144,42 +2164,58 @@ const App = () => {
                     </div>
                   </div>
 
-                  {/* Premium */}
-                  <div className="glass" style={{ padding: '24px', marginBottom: '20px', border: '1px solid rgba(217,119,6,0.2)', background: 'linear-gradient(135deg, rgba(217,119,6,0.04), rgba(180,83,9,0.04))' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                      <div style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', color: 'white', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(217,119,6,0.3)' }}>
-                        <Crown size={18} />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          Status Premium
-                          {appConfig.isPremium && <span style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', color: 'white', fontSize: '0.6rem', padding: '2px 8px', borderRadius: '20px', fontWeight: 700 }}>AKTIF</span>}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Akses semua fitur tanpa batasan</div>
-                      </div>
-                      <div style={{ marginLeft: 'auto' }}>
-                        <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
-                          <input type="checkbox" checked={appConfig.isPremium} onChange={e => setAppConfig(prev => ({ ...prev, isPremium: e.target.checked }))} style={{ display: 'none' }} />
-                          <div style={{ width: 44, height: 24, borderRadius: 12, background: appConfig.isPremium ? 'var(--primary)' : 'var(--border-card)', transition: '0.2s', position: 'relative', border: '1px solid rgba(0,0,0,0.1)' }}>
-                            <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: appConfig.isPremium ? 22 : 3, transition: '0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
+                  {/* Upgrade Paket */}
+                  {(() => {
+                    const { PLANS } = require('./config/plans') || {};
+                    const planKeys = ['free','starter','family','unlimited'];
+                    return (
+                      <div className="glass" style={{ padding: '24px', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+                          <div style={{ background: 'linear-gradient(135deg,#d97706,#b45309)', color: 'white', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(217,119,6,0.3)' }}>
+                            <Crown size={18} />
                           </div>
-                        </label>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>Paket Berlangganan</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              Paket aktif: <strong style={{ color: 'var(--primary)' }}>{(userPlan || 'free').toUpperCase()}</strong> · {familyMembers.length}/{planConfig.maxMembers === Infinity ? '∞' : planConfig.maxMembers} anggota
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          {planKeys.map(key => {
+                            const p = { free:{name:'Gratis',price:0,color:'#78716c',members:15,badge:'FREE'}, starter:{name:'Starter',price:29000,color:'#0284c7',members:50,badge:'STARTER'}, family:{name:'Family',price:79000,color:'#d97706',members:100,badge:'POPULER'}, unlimited:{name:'Unlimited',price:149000,color:'#7c3aed',members:'∞',badge:'ULTIMATE'} }[key];
+                            const isCurrent = (userPlan || 'free') === key;
+                            return (
+                              <div key={key} style={{ padding: '14px', borderRadius: '12px', border: `2px solid ${isCurrent ? p.color : 'var(--border-card)'}`, background: isCurrent ? `${p.color}10` : 'var(--bg-main)', transition: '0.2s', position: 'relative' }}>
+                                {p.badge === 'POPULER' && <span style={{ position: 'absolute', top: -8, right: 10, background: '#d97706', color: 'white', fontSize: '0.5rem', fontWeight: 800, padding: '2px 8px', borderRadius: '20px', letterSpacing: '0.05em' }}>POPULER</span>}
+                                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: p.color }}>{p.name}</div>
+                                <div style={{ fontSize: '1rem', fontWeight: 800, margin: '4px 0', color: 'var(--text-main)' }}>
+                                  {p.price === 0 ? 'Gratis' : `Rp ${p.price.toLocaleString('id')}`}
+                                  {p.price > 0 && <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)' }}>/bln</span>}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '10px' }}>Max {p.members} anggota</div>
+                                {isCurrent ? (
+                                  <span style={{ display: 'inline-block', background: p.color, color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '3px 10px', borderRadius: '20px' }}>✓ AKTIF</span>
+                                ) : (
+                                  <button style={{ width: '100%', padding: '6px', border: `1px solid ${p.color}`, borderRadius: '8px', background: 'transparent', color: p.color, fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                                    onClick={async () => {
+                                      if (!supabase || !currentFamily?.id) return;
+                                      const { error } = await supabase.from('families').update({ plan: key }).eq('id', currentFamily.id);
+                                      if (!error) { setUserPlan(key); setCurrentFamily(prev => ({ ...prev, plan: key })); alert(`Paket diubah ke ${p.name}!`); }
+                                    }}>
+                                    {key === 'free' ? 'Downgrade' : 'Upgrade'} →
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ marginTop: '12px', fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                          💳 Pembayaran: hubungi admin FamTree untuk proses upgrade manual
+                        </div>
                       </div>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label"><Key size={12} /> Kode Premium (bagikan ke pengguna)</label>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input
-                          value={appConfig.premiumCode || ''}
-                          onChange={e => setAppConfig(prev => ({ ...prev, premiumCode: e.target.value }))}
-                          className="fi"
-                          placeholder="Contoh: FAMTREE-PREMIUM"
-                          style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}
-                        />
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>Pengguna bisa input kode ini untuk unlock premium</div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '20px', borderRadius: '12px' }}>
                       <h3 style={{ marginBottom: '10px', fontSize: '1.1rem', color: '#0ea5e9' }}>Import Data Keluarga (Excel .xlsx)</h3>
@@ -2544,6 +2580,86 @@ const App = () => {
         onLoginSuccess={(member) => setFamilyUser(member)}
         familyMembers={familyMembers}
       />
+
+      {/* ── View Member Modal ── */}
+      {viewTarget && (() => {
+        const m = viewTarget;
+        const isDeceased = !!m.death;
+        const isMale = m.gender === 'male';
+        const gradient = isDeceased
+          ? 'linear-gradient(135deg,#94a3b8,#64748b)'
+          : isMale ? 'linear-gradient(135deg,#38bdf8,#6366f1)'
+          : 'linear-gradient(135deg,#f472b6,#f43f5e)';
+        const accent = isDeceased ? '#94a3b8' : isMale ? '#0ea5e9' : '#ec4899';
+        const birthYear = m.birth ? new Date(m.birth).getFullYear() : null;
+        const deathYear = m.death ? new Date(m.death).getFullYear() : null;
+        const spouseNames = m.spouses?.map(s => familyMembers.find(x => x.id === s.id)?.name).filter(Boolean) || [];
+        const extractCity = (addr) => { if (!addr) return null; const p = addr.split(',').map(x=>x.trim()).filter(Boolean); return p[p.length-1]||null; };
+        const rows = [
+          m.birth && { icon: '🎂', label: 'Lahir', value: `${new Date(m.birth).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}${birthYear&&deathYear?' (wafat '+deathYear+')':''}` },
+          extractCity(m.address) && { icon: '📍', label: 'Kota', value: extractCity(m.address) },
+          m.address && { icon: '🏠', label: 'Alamat', value: m.address },
+          m.occupation && { icon: '💼', label: 'Pekerjaan', value: m.occupation },
+          m.education && { icon: '🎓', label: 'Pendidikan', value: m.education },
+          m.phone && { icon: '📞', label: 'Telepon', value: m.phone },
+          spouseNames.length > 0 && { icon: '💍', label: 'Pasangan', value: spouseNames.join(', ') },
+          m.notes && { icon: '📝', label: 'Catatan', value: m.notes },
+        ].filter(Boolean);
+        return (
+          <AnimatePresence>
+            <motion.div className="vm-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={e => { if (e.target === e.currentTarget) setViewTarget(null); }}>
+              <motion.div className="vm-card" initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 26 }}>
+                {/* Hero */}
+                <div className="vm-hero" style={{ background: gradient }}>
+                  <div style={{ position: 'relative' }}>
+                    {m.photo && !m.photo.includes('unsplash.com') ? (
+                      <img src={m.photo} alt={m.name} className="vm-avatar" />
+                    ) : (
+                      <div className="vm-avatar-placeholder"><User size={32} /></div>
+                    )}
+                    <div className={`fnc-dot ${isDeceased ? 'dead' : 'live'}`} style={{ bottom: 4, right: 4 }} />
+                  </div>
+                  <div className="vm-name">{m.name}</div>
+                  {m.nasabLabel && <div className="vm-sub">{m.nasabLabel}</div>}
+                  <span className="vm-status-badge" style={{ background: isDeceased ? 'rgba(148,163,184,0.3)' : 'rgba(34,197,94,0.3)', color: 'white' }}>
+                    {isDeceased ? (isMale ? 'Almarhum' : 'Almarhumah') : '✦ Masih Hidup'}
+                  </span>
+                </div>
+
+                {/* Info rows */}
+                <div className="vm-body" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+                  {rows.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '16px 0' }}>Belum ada informasi detail</div>
+                  )}
+                  {rows.map((r, i) => (
+                    <div key={i} className="vm-row">
+                      <div className="vm-icon" style={{ background: `${accent}18`, fontSize: '1rem' }}>{r.icon}</div>
+                      <div>
+                        <div className="vm-label">{r.label}</div>
+                        <div className="vm-value">{r.value}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div className="vm-footer">
+                  <button className="btn glass" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setViewTarget(null)}>
+                    <X size={15} /> Tutup
+                  </button>
+                  {(user && (userRole === 'super_admin' || userRole === 'admin')) && (
+                    <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
+                      onClick={() => { setViewTarget(null); handleEdit(m); }}>
+                      <Edit2 size={15} /> Edit
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>
+        );
+      })()}
 
       {/* Edit Overlay */}
       {editingId && (() => {

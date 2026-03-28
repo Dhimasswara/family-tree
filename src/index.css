@@ -342,126 +342,213 @@ body {
 /* ─── Legacy node (kept for safety) ─────────────────── */
 .family-node { display: none; }
 
-/* ── Family Node Card (compact) ── */
-.fn-card {
-  width: 152px;
-  background: var(--bg-card);
-  border-radius: 14px;
-  border: 1.5px solid var(--border-card);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  overflow: hidden;
-  transition: box-shadow 0.2s, transform 0.2s;
-  cursor: pointer;
-}
-.fn-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.13); transform: translateY(-2px); }
-.fn-card.male  { border-top-color: rgba(2,132,199,0.35); }
-.fn-card.female { border-top-color: rgba(190,24,93,0.35); }
-.fn-card.deceased { opacity: 0.82; filter: grayscale(0.18); }
-
-/* Slim gradient strip */
-.fn-strip {
-  height: 44px;
+/* ── Premium Family Node Card ── */
+.fnc-wrap {
   position: relative;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  gap: 8px;
+  width: 158px;
 }
-
-/* Spouse dots */
-.fn-spouses {
+.fnc-glow {
   position: absolute;
-  top: 5px;
-  right: 6px;
-  display: flex;
-  gap: 3px;
+  inset: -1px;
+  border-radius: 17px;
+  filter: blur(6px);
+  z-index: 0;
+  pointer-events: none;
 }
-.fn-spouse-dot {
-  width: 14px; height: 14px;
+.fnc-card {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.fnc-card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.08); }
+.fnc-card.deceased { opacity: 0.78; filter: grayscale(0.22); }
+
+/* Header */
+.fnc-header {
+  padding: 12px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+.fnc-spouses {
+  position: absolute;
+  top: 6px; right: 7px;
+  display: flex; gap: 3px;
+}
+.fnc-heart {
+  width: 15px; height: 15px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.22);
+  border: 1px solid rgba(255,255,255,0.4);
   display: flex; align-items: center; justify-content: center;
   color: white;
-  border: 1px solid rgba(255,255,255,0.4);
 }
-.fn-spouse-dot.divorced { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
+.fnc-heart.divorced { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); }
 
-/* Compact avatar */
-.fn-avatar-sm {
+.fnc-avatar-wrap {
   position: relative;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
+  width: 46px; height: 46px;
 }
-.fn-avatar-sm-img {
-  width: 32px; height: 32px;
+.fnc-avatar-img {
+  width: 46px; height: 46px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgba(255,255,255,0.6);
+  border: 2.5px solid rgba(255,255,255,0.7);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
-.fn-avatar-sm-placeholder {
-  width: 32px; height: 32px;
+.fnc-avatar-placeholder {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(4px);
+  border: 2.5px solid rgba(255,255,255,0.4);
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+}
+.fnc-dot {
+  position: absolute;
+  bottom: 1px; right: 1px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.8);
+}
+.fnc-dot.live  { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.7); }
+.fnc-dot.dead  { background: #94a3b8; }
+
+.fnc-header-name {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: white;
+  text-align: center;
+  line-height: 1.2;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Body */
+.fnc-body {
+  padding: 9px 11px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fnc-years {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.fnc-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fnc-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.fnc-badge {
+  font-size: 0.56rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-live { background: rgba(34,197,94,0.12); color: #16a34a; }
+.badge-dead { background: rgba(148,163,184,0.18); color: #64748b; }
+.badge-nasab { }
+
+/* ── View Member Modal ── */
+.vm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.vm-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.22);
+  border: 1px solid var(--border-card);
+}
+.vm-hero {
+  padding: 28px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+.vm-avatar {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(255,255,255,0.6);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.vm-avatar-placeholder {
+  width: 80px; height: 80px;
   border-radius: 50%;
   background: rgba(255,255,255,0.2);
   display: flex; align-items: center; justify-content: center;
   color: white;
-  border: 2px solid rgba(255,255,255,0.35);
+  border: 3px solid rgba(255,255,255,0.4);
+  font-size: 2rem;
+}
+.vm-name { font-size: 1.2rem; font-weight: 800; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.2); text-align: center; }
+.vm-sub  { font-size: 0.78rem; color: rgba(255,255,255,0.8); text-align: center; }
+.vm-status-badge {
+  font-size: 0.65rem; font-weight: 800;
+  padding: 3px 12px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.05em;
 }
 
-/* Status dot */
-.fn-status-dot {
-  position: absolute;
-  bottom: 0; right: 0;
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  border: 1.5px solid white;
-}
-.fn-status-dot.alive    { background: #22c55e; box-shadow: 0 0 5px rgba(34,197,94,0.6); }
-.fn-status-dot.deceased { background: #94a3b8; }
-
-/* Body */
-.fn-body { padding: 8px 10px 9px; }
-
-.fn-name {
-  font-size: 0.8rem;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text-main);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.fn-years { font-size: 0.68rem; font-weight: 600; margin-top: 2px; }
-.fn-city {
+.vm-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; }
+.vm-row {
   display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  margin-top: 3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-main);
+  border-radius: 10px;
+  border: 1px solid var(--border-card);
 }
-.fn-tags { display: flex; gap: 4px; flex-wrap: wrap; }
-.fn-tag {
-  font-size: 0.58rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+.vm-icon {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
-.tag-alive    { background: rgba(5,150,105,0.12); color: #059669; }
-.tag-deceased { background: rgba(148,163,184,0.2); color: #64748b; }
-.tag-nasab    { }
-.fn-occupation {
-  font-size: 0.62rem;
-  color: var(--text-muted);
-  margin-top: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.vm-label { font-size: 0.65rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.vm-value { font-size: 0.85rem; font-weight: 600; color: var(--text-main); line-height: 1.3; }
+
+.vm-footer {
+  padding: 16px 22px;
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid var(--border-card);
 }
 
 /* ─── React Flow ──────────────────────────────────────── */
