@@ -1,16 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Users, X } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
-
-// Fix Leaflet default icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
 
 const extractCity = (address) => {
   if (!address) return null;
@@ -18,15 +7,15 @@ const extractCity = (address) => {
   return parts[parts.length - 1] || null;
 };
 
-// Geocode using Nominatim (free, no key needed)
 const geocodeCache = {};
 const geocodeCity = async (city) => {
   if (!city) return null;
   if (geocodeCache[city]) return geocodeCache[city];
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city + ', Indonesia')}&format=json&limit=1`, {
-      headers: { 'Accept-Language': 'id', 'User-Agent': 'FamTree/1.0' }
-    });
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city + ', Indonesia')}&format=json&limit=1`,
+      { headers: { 'Accept-Language': 'id', 'User-Agent': 'FamTree/1.0' } }
+    );
     const data = await res.json();
     if (data?.[0]) {
       const result = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
@@ -37,29 +26,48 @@ const geocodeCity = async (city) => {
   return null;
 };
 
-const MapBounds = ({ markers }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (markers.length === 0) return;
-    if (markers.length === 1) {
-      map.setView([markers[0].lat, markers[0].lng], 10);
-    } else {
-      const bounds = L.latLngBounds(markers.map(m => [m.lat, m.lng]));
-      map.fitBounds(bounds, { padding: [40, 40] });
-    }
-  }, [markers, map]);
-  return null;
-};
-
 const MapView = ({ familyMembers, onClose }) => {
-  const [markers, setMarkers] = useState([]);
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [markerCount, setMarkerCount] = useState(0);
+
+  const membersWithCity = familyMembers.filter(m => extractCity(m.address));
+  const membersNoCity = familyMembers.length - membersWithCity.length;
 
   useEffect(() => {
-    const geocodeAll = async () => {
-      setLoading(true);
-      // Group members by city
+    // Dynamically load Leaflet CSS
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    const initMap = async () => {
+      // Dynamically import Leaflet
+      const L = (await import('leaflet')).default;
+
+      // Fix default icon
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      if (!mapRef.current || mapInstanceRef.current) return;
+
+      const map = L.map(mapRef.current).setView([-2.5, 118], 5);
+      mapInstanceRef.current = map;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+
+      // Group by city
       const cityMap = {};
       familyMembers.forEach(m => {
         const city = extractCity(m.address);
@@ -70,6 +78,7 @@ const MapView = ({ familyMembers, onClose }) => {
 
       const cities = Object.keys(cityMap);
       const results = [];
+
       for (let i = 0; i < cities.length; i++) {
         const city = cities[i];
         setProgress(Math.round(((i + 1) / cities.length) * 100));
@@ -77,17 +86,62 @@ const MapView = ({ familyMembers, onClose }) => {
         if (coords) {
           results.push({ ...coords, city, members: cityMap[city] });
         }
-        // Rate limit: Nominatim requires 1 req/sec
         if (i < cities.length - 1) await new Promise(r => setTimeout(r, 1100));
       }
-      setMarkers(results);
+
+      // Add markers
+      results.forEach(m => {
+        const memberList = m.members.slice(0, 5)
+          .map(mem => `
+            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #f1f5f9">
+              <div style="width:20px;height:20px;border-radius:50%;background:${mem.gender === 'male' ? '#e0f2fe' : '#fce7f3'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px">
+                ${mem.gender === 'male' ? '♂' : '♀'}
+              </div>
+              <span style="font-size:0.8rem;font-weight:600;color:#1c1917">${mem.name}</span>
+              ${mem.death ? '<span style="font-size:0.65rem;color:#94a3b8;margin-left:auto">†</span>' : ''}
+            </div>
+          `).join('');
+
+        const extra = m.members.length > 5
+          ? `<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">+${m.members.length - 5} lainnya</div>`
+          : '';
+
+        const popup = L.popup().setContent(`
+          <div style="font-family:Outfit,sans-serif;min-width:160px">
+            <div style="font-weight:800;font-size:0.95rem;margin-bottom:8px;color:#1c1917;display:flex;align-items:center;gap:6px">
+              📍 ${m.city}
+            </div>
+            <div style="font-size:0.78rem;color:#78716c;margin-bottom:6px">${m.members.length} anggota keluarga</div>
+            ${memberList}
+            ${extra}
+          </div>
+        `);
+
+        L.marker([m.lat, m.lng]).addTo(map).bindPopup(popup);
+      });
+
+      setMarkerCount(results.length);
+
+      // Fit bounds
+      if (results.length === 1) {
+        map.setView([results[0].lat, results[0].lng], 10);
+      } else if (results.length > 1) {
+        const bounds = L.latLngBounds(results.map(r => [r.lat, r.lng]));
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+
       setLoading(false);
     };
-    geocodeAll();
-  }, [familyMembers]);
 
-  const membersWithCity = familyMembers.filter(m => extractCity(m.address));
-  const membersNoCity = familyMembers.length - membersWithCity.length;
+    initMap();
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'var(--bg-main)', display: 'flex', flexDirection: 'column' }}>
@@ -99,11 +153,13 @@ const MapView = ({ familyMembers, onClose }) => {
         <div>
           <div style={{ fontWeight: 800, fontSize: '1rem' }}>Peta Persebaran Keluarga</div>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-            {markers.length} kota · {membersWithCity.length} anggota terpetakan
-            {membersNoCity > 0 && ` · ${membersNoCity} belum punya alamat`}
+            {loading ? `Memuat lokasi... ${progress}%` : `${markerCount} kota · ${membersWithCity.length} anggota terpetakan${membersNoCity > 0 ? ` · ${membersNoCity} belum punya alamat` : ''}`}
           </div>
         </div>
-        <button onClick={onClose} style={{ marginLeft: 'auto', width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border-card)', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}>
+        <button
+          onClick={onClose}
+          style={{ marginLeft: 'auto', width: 34, height: 34, borderRadius: 9, border: '1px solid var(--border-card)', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
+        >
           <X size={16} />
         </button>
       </div>
@@ -119,46 +175,10 @@ const MapView = ({ familyMembers, onClose }) => {
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Menggunakan OpenStreetMap (gratis)</div>
           </div>
         )}
-        <MapContainer
-          center={[-2.5, 118]}
-          zoom={5}
-          style={{ width: '100%', height: '100%' }}
-          zoomControl={true}
-        >
-          <TileLayer
-            attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          {markers.length > 0 && <MapBounds markers={markers} />}
-          {markers.map((m, i) => (
-            <Marker key={i} position={[m.lat, m.lng]}>
-              <Popup>
-                <div style={{ fontFamily: 'Outfit, sans-serif', minWidth: 160 }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.95rem', marginBottom: 8, color: '#1c1917', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <MapPin size={14} color="#d97706" /> {m.city}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#78716c', marginBottom: 6 }}>{m.members.length} anggota keluarga</div>
-                  {m.members.slice(0, 5).map(mem => (
-                    <div key={mem.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: mem.gender === 'male' ? '#e0f2fe' : '#fce7f3', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Users size={10} color={mem.gender === 'male' ? '#0284c7' : '#be185d'} />
-                      </div>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1c1917' }}>{mem.name}</span>
-                      {mem.death && <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginLeft: 'auto' }}>†</span>}
-                    </div>
-                  ))}
-                  {m.members.length > 5 && (
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 4 }}>+{m.members.length - 5} lainnya</div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
+        <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
       </div>
 
-      {/* Bottom legend */}
-      {!loading && markers.length === 0 && (
+      {!loading && markerCount === 0 && (
         <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
           <MapPin size={32} style={{ opacity: 0.3, marginBottom: 8, display: 'block', margin: '0 auto 8px' }} />
           Belum ada anggota dengan alamat lengkap.<br />Tambahkan alamat di profil anggota.
