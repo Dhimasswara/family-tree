@@ -1026,7 +1026,7 @@ const App = () => {
               target: unionId,
               sourceHandle: 'right-source',
               targetHandle: 'left',
-              style: { stroke: '#94a3b8', strokeWidth: 2 }
+              style: { stroke: 'var(--edge-union)', strokeWidth: 1.5, opacity: 0.6 }
             });
             // Ibu -> Union (Dari kiri)
             edges.push({
@@ -1035,7 +1035,7 @@ const App = () => {
               target: unionId,
               sourceHandle: 'left-source',
               targetHandle: 'right',
-              style: { stroke: '#94a3b8', strokeWidth: 2 }
+              style: { stroke: 'var(--edge-union)', strokeWidth: 1.5, opacity: 0.6 }
             });
           }
 
@@ -1046,13 +1046,11 @@ const App = () => {
             target: m.id,
             sourceHandle: 'bottom',
             targetHandle: 'top',
-            animated: true,
-            style: { stroke: '#0284c7', strokeWidth: 2.5 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#0284c7' }
+            style: { stroke: 'var(--edge-child)', strokeWidth: 2 },
           });
         }
       } else if (m.fatherId || m.motherId) {
-        // Fallback jika cuma ada 1 orang tua (misal orang tua tunggal / bawaan anak tiri)
+        // Fallback: single parent
         const parentId = m.fatherId || m.motherId;
         const parentNode = nodes.find(n => n.id === parentId);
         if (parentNode) {
@@ -1062,9 +1060,7 @@ const App = () => {
             target: m.id,
             sourceHandle: 'bottom',
             targetHandle: 'top',
-            animated: true,
-            style: { stroke: '#94a3b8', strokeWidth: 2.5, strokeDasharray: '4,4' },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' }
+            style: { stroke: 'var(--edge-child)', strokeWidth: 1.5, strokeDasharray: '5,4', opacity: 0.7 },
           });
         }
       }
@@ -1091,12 +1087,11 @@ const App = () => {
             sourceHandle: 'right-source',
             targetHandle: 'left-target',
             style: {
-              stroke: s.type === 'divorced' ? '#94a3b8' : '#d97706',
-              strokeWidth: 3,
-              strokeDasharray: s.type === 'divorced' ? '4,4' : '0'
+              stroke: s.type === 'divorced' ? 'var(--edge-divorced)' : 'var(--edge-spouse)',
+              strokeWidth: s.type === 'divorced' ? 1.5 : 2.5,
+              strokeDasharray: s.type === 'divorced' ? '6,4' : '0',
+              opacity: s.type === 'divorced' ? 0.5 : 1,
             },
-            label: s.type === 'divorced' ? 'Bercerai' : 'Menikah',
-            labelStyle: { fill: '#94a3b8', fontSize: 10 }
           });
         }
 
@@ -1138,7 +1133,7 @@ const App = () => {
                source: maleId,
                target: finalUnionId,
                sourceHandle: 'right-source', targetHandle: 'left',
-               style: { stroke: '#94a3b8', strokeWidth: 2 },
+               style: { stroke: 'var(--edge-union)', strokeWidth: 1.5, opacity: 0.6 },
                hidden: !hasKids
             });
             edges.push({
@@ -1146,7 +1141,7 @@ const App = () => {
                source: femaleId,
                target: finalUnionId,
                sourceHandle: 'left-source', targetHandle: 'right',
-               style: { stroke: '#94a3b8', strokeWidth: 2 },
+               style: { stroke: 'var(--edge-union)', strokeWidth: 1.5, opacity: 0.6 },
                hidden: !hasKids
             });
         }

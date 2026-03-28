@@ -13,6 +13,10 @@
   --male-border: #0284c7;
   --female-border: #be185d;
   --edge-color: #d4c4a8;
+  --edge-child: #a8b4c8;
+  --edge-spouse: #d97706;
+  --edge-union: #c4b8a8;
+  --edge-divorced: #94a3b8;
   --control-bg: #fffdf7;
   --control-icon: #1c1917;
   --success: #059669;
@@ -30,6 +34,10 @@
   --primary-hover: #d97706;
   --primary-light: rgba(245, 158, 11, 0.15);
   --edge-color: #57534e;
+  --edge-child: #4a5568;
+  --edge-spouse: #d97706;
+  --edge-union: #3d3530;
+  --edge-divorced: #4a5568;
   --control-bg: #1c1917;
   --control-icon: #faf7f2;
 }
@@ -555,7 +563,15 @@ body {
 .react-flow__edge-path {
   stroke: var(--edge-color);
   stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3px;
+  opacity: 1 !important;
+}
+/* Sembunyikan label edge default */
+.react-flow__edge-text { display: none; }
 
 .react-flow__controls {
   background: var(--control-bg) !important;
