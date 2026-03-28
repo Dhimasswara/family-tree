@@ -388,7 +388,15 @@ const App = () => {
   const [appPage, setAppPage] = useState('landing');
   // Current family data (for multi-tenant)
   const [currentFamily, setCurrentFamily] = useState(null);
-  const [userPlan, setUserPlan] = useState('free');
+  // Initialize plan from cache to avoid flash of lock icons on reload
+  const [userPlan, setUserPlan] = useState(() => {
+    try {
+      const fam = sessionStorage.getItem('famSession');
+      if (fam) return JSON.parse(fam)?.family?.plan || 'free';
+    } catch (_) {}
+    return localStorage.getItem('_cachedPlan') || 'free';
+  });
+  const [authReady, setAuthReady] = useState(false);
 
   const planConfig = getPlanConfig(userPlan);
   const canAddMember = familyMembers.length < planConfig.maxMembers;
@@ -569,6 +577,7 @@ const App = () => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) restoreSession(u);
+      setAuthReady(true);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -665,6 +674,25 @@ const App = () => {
     if (view === 'gallery' && currentFamily?.id) refreshGallery(currentFamily.id);
   }, [view]);
 
+  // Realtime subscription — push gallery updates to all open tabs/users instantly
+  useEffect(() => {
+    if (!supabase || !currentFamily?.id) return;
+    const channel = supabase
+      .channel(`gallery-${currentFamily.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'families',
+        filter: `id=eq.${currentFamily.id}`,
+      }, (payload) => {
+        if (Array.isArray(payload.new?.gallery)) {
+          setGalleryPosts(payload.new.gallery);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentFamily?.id]);
+
   // Stable saveGallery — tries RPC first (works for family members), falls back to direct update (admin)
   const saveGallery = useCallback(async (posts) => {
     setGalleryPosts(posts);
@@ -727,6 +755,9 @@ const App = () => {
 
   // Persist active view across reloads
   useEffect(() => { localStorage.setItem('lastView', view); }, [view]);
+
+  // Cache plan so it's available synchronously on next reload (prevents lock flash)
+  useEffect(() => { localStorage.setItem('_cachedPlan', userPlan); }, [userPlan]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -2068,16 +2099,16 @@ const App = () => {
             <Trees size={14} /> Pohon
           </button>
           <button className="nav-pill" onClick={() => {
-            if (!planConfig.features.maps) { openProModal('Fitur Peta tersedia di paket Starter ke atas.'); return; }
+            if (authReady && !planConfig.features.maps) { openProModal('Fitur Peta tersedia di paket Starter ke atas.'); return; }
             setShowMapView(true);
           }}>
-            <MapPin size={14} /> Peta {!planConfig.features.maps && '🔒'}
+            <MapPin size={14} /> Peta {authReady && !planConfig.features.maps && '🔒'}
           </button>
           <button className="nav-pill" onClick={() => {
-            if (!planConfig.features.kinship) { openProModal('Fitur Galeri Cerita tersedia di paket Starter ke atas.'); return; }
+            if (authReady && !planConfig.features.kinship) { openProModal('Fitur Galeri Cerita tersedia di paket Starter ke atas.'); return; }
             setView('gallery');
           }} style={view === 'gallery' ? { background: 'var(--primary)', color: 'white' } : {}}>
-            📸 Galeri {!planConfig.features.kinship && '🔒'}
+            📸 Galeri {authReady && !planConfig.features.kinship && '🔒'}
           </button>
           <button className={`nav-pill ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>
             <TableIcon size={14} /> Tabel
