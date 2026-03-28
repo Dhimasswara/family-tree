@@ -358,7 +358,6 @@ const App = () => {
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const isInitialLoad = useRef(true);
-  const currentFamilyRef = useRef(null); // stable ref to avoid stale closure in saveGallery
   
   // Auth & Roles States
   const [user, setUser] = useState(null);
@@ -376,16 +375,18 @@ const App = () => {
   const [straightEdges, setStraightEdges] = useState(false);
   const [layoutKey, setLayoutKey] = useState(0); // increment to force re-layout
   const rfRef = useRef(null);
-  const [galleryPosts, setGalleryPosts]   = useState([]);
-  const [galleryLoading, setGalleryLoading] = useState(false);
   // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
   const [toast, setToast] = useState(null);
   const [proModal, setProModal] = useState(null);   // { message }
   const [confirmModal, setConfirmModal] = useState(null); // { message, onConfirm }
   // View modal (klik node di tree)
   const [viewTarget, setViewTarget] = useState(null);
-  // Page routing: 'landing' | 'auth' | 'app'
-  const [appPage, setAppPage] = useState('landing');
+  // Page routing: 'loading' | 'landing' | 'auth' | 'app'
+  // Start 'app' if family session cached → no flash of landing page
+  const [appPage, setAppPage] = useState(() => {
+    try { if (sessionStorage.getItem('famSession')) return 'app'; } catch (_) {}
+    return 'loading'; // Briefly show spinner while Supabase auth check runs
+  });
   // Current family data (for multi-tenant)
   const [currentFamily, setCurrentFamily] = useState(null);
   // Initialize plan from cache to avoid flash of lock icons on reload
@@ -571,12 +572,13 @@ const App = () => {
       } catch (_) { sessionStorage.removeItem('famSession'); }
     }
 
-    if (!supabase) return;
+    if (!supabase) { setAppPage(p => p === 'loading' ? 'landing' : p); setAuthReady(true); return; }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
       setUser(u);
       if (u) restoreSession(u);
+      else setAppPage(p => p === 'loading' ? 'landing' : p); // no admin session → show landing
       setAuthReady(true);
     });
 
@@ -651,60 +653,7 @@ const App = () => {
     fetchData();
   }, [fetchData]);
 
-  // Keep ref in sync with state
-  useEffect(() => { currentFamilyRef.current = currentFamily; }, [currentFamily]);
 
-  // Load gallery dari Supabase — callable as a stable fn (used on mount + view switch)
-  const refreshGallery = useCallback(async (familyId) => {
-    if (!supabase || !familyId) return;
-    setGalleryLoading(true);
-    const { data } = await supabase.from('families').select('gallery').eq('id', familyId).single();
-    if (data && Array.isArray(data.gallery)) setGalleryPosts(data.gallery);
-    else if (data && data.gallery) setGalleryPosts(data.gallery);
-    setGalleryLoading(false);
-  }, []);
-
-  // Load on family mount
-  useEffect(() => {
-    if (currentFamily?.id) refreshGallery(currentFamily.id);
-  }, [currentFamily?.id, refreshGallery]);
-
-  // Re-fetch every time user opens gallery view (keeps it fresh)
-  useEffect(() => {
-    if (view === 'gallery' && currentFamily?.id) refreshGallery(currentFamily.id);
-  }, [view]);
-
-  // Realtime subscription — push gallery updates to all open tabs/users instantly
-  useEffect(() => {
-    if (!supabase || !currentFamily?.id) return;
-    const channel = supabase
-      .channel(`gallery-${currentFamily.id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'families',
-        filter: `id=eq.${currentFamily.id}`,
-      }, (payload) => {
-        if (Array.isArray(payload.new?.gallery)) {
-          setGalleryPosts(payload.new.gallery);
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [currentFamily?.id]);
-
-  // Stable saveGallery — tries RPC first (works for family members), falls back to direct update (admin)
-  const saveGallery = useCallback(async (posts) => {
-    setGalleryPosts(posts);
-    const fam = currentFamilyRef.current;
-    if (!supabase || !fam?.id) return;
-    // Try RPC (SECURITY DEFINER — bypasses RLS for family members)
-    const { error: rpcErr } = await supabase.rpc('save_family_gallery', { p_family_id: fam.id, p_gallery: posts });
-    if (!rpcErr) return;
-    // Fallback: direct update (works when admin is logged in via Supabase auth)
-    const { error: updErr } = await supabase.from('families').update({ gallery: posts }).eq('id', fam.id);
-    if (updErr) console.error('Gagal simpan galeri:', updErr.message);
-  }, []);
 
   useEffect(() => {
     // Auto-sync ke Supabase: HANYA jika User Login
@@ -2047,6 +1996,13 @@ const App = () => {
   };
 
   // Page routing
+  if (appPage === 'loading') {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)' }}>
+        <div style={{ width: 36, height: 36, border: '3px solid var(--border-card)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      </div>
+    );
+  }
   if (appPage === 'landing') {
     return <LandingPage onNavigate={setAppPage} />;
   }
@@ -2261,12 +2217,9 @@ const App = () => {
           ) : view === 'gallery' ? (
             <GalleryView
               key="gallery"
-              posts={galleryPosts}
-              loading={galleryLoading}
-              familyMembers={familyMembers}
+              familyId={currentFamily?.id}
               currentUser={user ? { id: user.id, name: user.email?.split('@')[0], isAdmin: true } : familyUser ? { id: familyUser.id, name: familyUser.name, isAdmin: false } : null}
               canEdit={!!(user || familyUser)}
-              onSave={saveGallery}
             />
           ) : ((userRole === 'super_admin' || userRole === 'admin') && view === 'settings') ? (
             <motion.div key="settings" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>

@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Image, Send, Trash2, Heart, ChevronDown, ChevronUp, CornerDownRight, MapPin, Crop, Loader } from 'lucide-react';
 import Cropper from 'react-easy-crop';
+import { supabase } from '../lib/supabase';
 
 // ── Helpers ──
 const formatDate = (iso) => {
@@ -34,7 +35,7 @@ const getCroppedImg = (imageSrc, pixelCrop) => new Promise((resolve, reject) => 
 // ── Location Autocomplete ──
 const LocationInput = ({ value, onChange }) => {
   const [suggestions, setSuggestions] = useState([]);
-  const [loading, setLoading]         = useState(false);
+  const [loadingLoc, setLoadingLoc]   = useState(false);
   const [open, setOpen]               = useState(false);
   const debounceRef = useRef(null);
   const wrapRef     = useRef(null);
@@ -50,7 +51,7 @@ const LocationInput = ({ value, onChange }) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
     debounceRef.current = setTimeout(async () => {
-      setLoading(true);
+      setLoadingLoc(true);
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1`,
@@ -59,13 +60,12 @@ const LocationInput = ({ value, onChange }) => {
         const data = await res.json();
         setSuggestions(data.map(d => {
           const a = d.address || {};
-          // Build a concise label: City, Country
           const parts = [a.city || a.town || a.village || a.county, a.state, a.country].filter(Boolean);
           return { label: parts.join(', ') || d.display_name, full: d.display_name };
         }));
         setOpen(true);
       } catch (_) {}
-      setLoading(false);
+      setLoadingLoc(false);
     }, 550);
   };
 
@@ -82,8 +82,8 @@ const LocationInput = ({ value, onChange }) => {
           placeholder="Tambah lokasi (opsional)..."
           style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '0.8rem', fontFamily: 'inherit', color: 'var(--text-main)' }}
         />
-        {loading && <Loader size={11} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />}
-        {value && !loading && (
+        {loadingLoc && <Loader size={11} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />}
+        {value && !loadingLoc && (
           <button onClick={() => { onChange(''); setSuggestions([]); setOpen(false); }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex', alignItems: 'center' }}>
             <X size={11}/>
@@ -115,8 +115,8 @@ const LocationInput = ({ value, onChange }) => {
 
 // ── Crop Modal ──
 const CropModal = ({ src, onConfirm, onCancel }) => {
-  const [crop, setCrop]   = useState({ x: 0, y: 0 });
-  const [zoom, setZoom]   = useState(1);
+  const [crop, setCrop]     = useState({ x: 0, y: 0 });
+  const [zoom, setZoom]     = useState(1);
   const [aspect, setAspect] = useState(4 / 3);
   const cropAreaRef = useRef(null);
 
@@ -141,8 +141,6 @@ const CropModal = ({ src, onConfirm, onCancel }) => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column' }}>
-
-      {/* Header */}
       <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(0,0,0,0.5)', flexShrink: 0 }}>
         <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg,#d97706,#b45309)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Crop size={15} color="white" />
@@ -152,40 +150,25 @@ const CropModal = ({ src, onConfirm, onCancel }) => {
           <X size={15} />
         </button>
       </div>
-
-      {/* Crop area */}
       <div style={{ flex: 1, position: 'relative' }}>
-        <Cropper
-          image={src}
-          crop={crop}
-          zoom={zoom}
-          aspect={aspect}
-          onCropChange={setCrop}
-          onZoomChange={setZoom}
-          onCropComplete={onCropComplete}
-        />
+        <Cropper image={src} crop={crop} zoom={zoom} aspect={aspect}
+          onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropComplete} />
       </div>
-
-      {/* Controls */}
       <div style={{ padding: '14px 18px', background: 'rgba(0,0,0,0.5)', flexShrink: 0 }}>
-        {/* Aspect ratio pills */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
           {aspects.map(a => (
-            <button key={a.label}
-              onClick={() => setAspect(a.val)}
+            <button key={a.label} onClick={() => setAspect(a.val)}
               style={{ padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, fontFamily: 'Outfit,sans-serif',
                 background: aspect === a.val ? '#d97706' : 'rgba(255,255,255,0.15)', color: 'white' }}>
               {a.label}
             </button>
           ))}
         </div>
-        {/* Zoom slider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', width: 40 }}>Zoom</span>
           <input type="range" min={1} max={3} step={0.05} value={zoom} onChange={e => setZoom(+e.target.value)}
             style={{ flex: 1, accentColor: '#d97706' }} />
         </div>
-        {/* Buttons */}
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onCancel}
             style={{ flex: 1, padding: '11px', background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 10, color: 'white', fontWeight: 600, cursor: 'pointer', fontFamily: 'Outfit,sans-serif', fontSize: '0.88rem' }}>
@@ -218,8 +201,8 @@ const CommentThread = ({ comments = [], currentUser, canAdmin, onUpdate }) => {
     onUpdate(comments.map(c => c.id === cid ? { ...c, replies: [...(c.replies || []), { id: `r${Date.now()}`, authorId: currentUser.id, authorName: currentUser.name, text: replyText.trim(), createdAt: new Date().toISOString() }] } : c));
     setReplyText(''); setReplyTo(null);
   };
-  const delComment = (cid)        => onUpdate(comments.filter(c => c.id !== cid));
-  const delReply   = (cid, rid)   => onUpdate(comments.map(c => c.id === cid ? { ...c, replies: (c.replies||[]).filter(r => r.id !== rid) } : c));
+  const delComment = (cid)      => onUpdate(comments.filter(c => c.id !== cid));
+  const delReply   = (cid, rid) => onUpdate(comments.map(c => c.id === cid ? { ...c, replies: (c.replies||[]).filter(r => r.id !== rid) } : c));
 
   return (
     <div style={{ borderTop: '1px solid var(--border-card)', padding: '10px 14px 12px' }}>
@@ -285,17 +268,51 @@ const CommentThread = ({ comments = [], currentUser, canAdmin, onUpdate }) => {
 };
 
 // ── Main GalleryView ──
-const GalleryView = ({ posts = [], loading = false, currentUser, canEdit, onSave }) => {
-  const [showForm, setShowForm]     = useState(false);
-  const [text, setText]             = useState('');
-  const [location, setLocation]     = useState('');
-  const [rawSrc, setRawSrc]         = useState(null);   // original file for crop
-  const [photo, setPhoto]           = useState(null);   // final cropped
-  const [lightbox, setLightbox]     = useState(null);
+// Self-contained: all Supabase operations happen here directly on gallery_posts table
+const GalleryView = ({ familyId, currentUser, canEdit }) => {
+  const [posts, setPosts]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [text, setText]         = useState('');
+  const [location, setLocation] = useState('');
+  const [rawSrc, setRawSrc]     = useState(null);
+  const [photo, setPhoto]       = useState(null);
+  const [lightbox, setLightbox] = useState(null);
+  const [saving, setSaving]     = useState(false);
   const fileRef = useRef();
 
   const userId = currentUser?.id || 'anon';
 
+  // ── Load posts ──
+  const loadPosts = useCallback(async () => {
+    if (!supabase || !familyId) { setLoading(false); return; }
+    const { data, error } = await supabase
+      .from('gallery_posts')
+      .select('*')
+      .eq('family_id', familyId)
+      .order('created_at', { ascending: false });
+    if (!error && data) setPosts(data);
+    setLoading(false);
+  }, [familyId]);
+
+  useEffect(() => { loadPosts(); }, [loadPosts]);
+
+  // ── Realtime subscription ──
+  useEffect(() => {
+    if (!supabase || !familyId) return;
+    const channel = supabase
+      .channel(`gallery_posts:${familyId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'gallery_posts',
+        filter: `family_id=eq.${familyId}`,
+      }, () => { loadPosts(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [familyId, loadPosts]);
+
+  // ── File pick ──
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -305,40 +322,65 @@ const GalleryView = ({ posts = [], loading = false, currentUser, canEdit, onSave
     e.target.value = '';
   };
 
-  const handleSubmit = () => {
+  // ── Submit post ──
+  const handleSubmit = async () => {
     if (!text.trim() && !photo) return;
-    const newPost = {
+    if (!supabase || !familyId) return;
+    setSaving(true);
+    const post = {
       id: `p${Date.now()}`,
-      authorId:   currentUser?.id   || 'anon',
-      authorName: currentUser?.name || 'Anonim',
-      text:  text.trim(),
+      family_id: familyId,
+      author_id: currentUser?.id || 'anon',
+      author_name: currentUser?.name || 'Anonim',
+      text: text.trim(),
       photo: photo || null,
       location: location.trim() || null,
-      createdAt: new Date().toISOString(),
-      likedBy: [],
+      created_at: new Date().toISOString(),
+      liked_by: [],
       comments: [],
     };
-    onSave([newPost, ...posts]);
+    // Optimistic
+    setPosts(prev => [post, ...prev]);
     setText(''); setPhoto(null); setLocation(''); setShowForm(false);
+
+    const { error } = await supabase.from('gallery_posts').insert(post);
+    if (error) {
+      console.error('Gagal post:', error.message);
+      setPosts(prev => prev.filter(p => p.id !== post.id));
+    }
+    setSaving(false);
   };
 
-  const handleDelete = (id) => onSave(posts.filter(p => p.id !== id));
-
-  const toggleLike = (id) => {
-    onSave(posts.map(p => {
-      if (p.id !== id) return p;
-      const likedBy = p.likedBy || [];
-      return { ...p, likedBy: likedBy.includes(userId) ? likedBy.filter(x => x !== userId) : [...likedBy, userId] };
-    }));
+  // ── Delete post ──
+  const handleDelete = async (id) => {
+    setPosts(prev => prev.filter(p => p.id !== id));
+    await supabase?.from('gallery_posts').delete().eq('id', id);
   };
 
-  const updateComments = (postId, comments) => onSave(posts.map(p => p.id === postId ? { ...p, comments } : p));
+  // ── Toggle like ──
+  const toggleLike = async (id) => {
+    const post = posts.find(p => p.id === id);
+    if (!post) return;
+    const likedBy = post.liked_by || [];
+    const newLikedBy = likedBy.includes(userId)
+      ? likedBy.filter(x => x !== userId)
+      : [...likedBy, userId];
+    // Optimistic
+    setPosts(prev => prev.map(p => p.id === id ? { ...p, liked_by: newLikedBy } : p));
+    await supabase?.from('gallery_posts').update({ liked_by: newLikedBy }).eq('id', id);
+  };
+
+  // ── Update comments ──
+  const updateComments = async (postId, comments) => {
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments } : p));
+    await supabase?.from('gallery_posts').update({ comments }).eq('id', postId);
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ maxWidth: 660, margin: '0 auto', padding: '22px 14px 60px', width: '100%' }}>
 
-      {/* Hidden file input — always mounted */}
+      {/* Hidden file input */}
       <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
 
       {/* Crop modal */}
@@ -384,12 +426,10 @@ const GalleryView = ({ posts = [], loading = false, currentUser, canEdit, onSave
                 style={{ width: '100%', minHeight: 76, resize: 'vertical', fontFamily: 'inherit', padding: '9px 11px', fontSize: '0.86rem', lineHeight: 1.6, borderRadius: 10, marginBottom: 8, boxSizing: 'border-box' }}
               />
 
-              {/* Location input */}
               <div style={{ marginBottom: 10 }}>
                 <LocationInput value={location} onChange={setLocation} />
               </div>
 
-              {/* Photo preview */}
               {photo && (
                 <div style={{ position: 'relative', marginBottom: 10 }}>
                   <img src={photo} alt="preview" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 9 }}/>
@@ -409,8 +449,8 @@ const GalleryView = ({ posts = [], loading = false, currentUser, canEdit, onSave
                   <Image size={12}/> {photo ? 'Ganti Foto' : 'Pilih Foto'}
                 </button>
                 <button className="btn btn-primary" style={{ marginLeft: 'auto', fontSize: '0.78rem', padding: '6px 14px' }}
-                  disabled={!text.trim() && !photo} onClick={handleSubmit}>
-                  <Send size={11}/> Posting
+                  disabled={(!text.trim() && !photo) || saving} onClick={handleSubmit}>
+                  {saving ? <Loader size={11} style={{ animation: 'spin 0.8s linear infinite' }}/> : <><Send size={11}/> Posting</>}
                 </button>
               </div>
             </div>
@@ -433,20 +473,20 @@ const GalleryView = ({ posts = [], loading = false, currentUser, canEdit, onSave
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {posts.map((post, idx) => {
-            const likedBy  = post.likedBy || [];
+            const likedBy  = post.liked_by || [];
             const isLiked  = likedBy.includes(userId);
-            const canDelete = currentUser?.isAdmin || currentUser?.id === post.authorId;
+            const canDelete = currentUser?.isAdmin || currentUser?.id === post.author_id;
             return (
               <motion.div key={post.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}
                 className="glass" style={{ borderRadius: 14, overflow: 'hidden' }}>
 
                 {/* Header */}
                 <div style={{ padding: '12px 13px 7px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Avatar name={post.authorName} size={32} />
+                  <Avatar name={post.author_name} size={32} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{post.authorName}</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{post.author_name}</div>
                     <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span>{formatDate(post.createdAt)}</span>
+                      <span>{formatDate(post.created_at)}</span>
                       {post.location && <><span>·</span><MapPin size={9}/><span>{post.location}</span></>}
                     </div>
                   </div>
