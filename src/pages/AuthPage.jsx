@@ -97,7 +97,7 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
       // Get family by code
       const { data: fam, error: famErr } = await supabase
         .from('families')
-        .select('id, name')
+        .select('id, name, plan')
         .eq('code', familyCode.trim().toUpperCase())
         .single();
       if (famErr || !fam) throw new Error('Kode keluarga tidak ditemukan.');
@@ -244,7 +244,6 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{memberList.family.name}</div>
                           <div style={{ fontSize: '0.7rem', color: '#a8a29e' }}>{memberList.members.length} anggota ditemukan</div>
-                          <div style={{ fontSize: '0.65rem', color: '#f59e0b', wordBreak: 'break-all' }}>family_id: {memberList.family.id}</div>
                         </div>
                         <button onClick={() => { setMemberList(null); setFamilyCode(''); setError(''); setSelectedMemberId(''); setPin(''); }} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e' }}>
                           <ChevronLeft size={16} />

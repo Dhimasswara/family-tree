@@ -545,6 +545,18 @@ const App = () => {
 
   // Monitor Auth State
   useEffect(() => {
+    // Restore family member session from sessionStorage (handles page reload)
+    const saved = sessionStorage.getItem('famSession');
+    if (saved) {
+      try {
+        const { member, family } = JSON.parse(saved);
+        setFamilyUser(member);
+        setCurrentFamily(family);
+        setUserPlan(family?.plan || 'free');
+        setAppPage('app');
+      } catch (_) { sessionStorage.removeItem('famSession'); }
+    }
+
     if (!supabase) return;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -1988,6 +2000,9 @@ const App = () => {
         onFamilyLoginSuccess={(member, family) => {
           setFamilyUser(member);
           setCurrentFamily(family);
+          setUserPlan(family?.plan || 'free');
+          // Persist family member session across page reload
+          sessionStorage.setItem('famSession', JSON.stringify({ member, family }));
           setAppPage('app');
         }}
         familyMembers={familyMembers}
@@ -2053,7 +2068,7 @@ const App = () => {
             <div className="navbar-user-chip">
               <div className="navbar-user-avatar"><User size={12} /></div>
               <span>{familyUser.name}</span>
-              <button className="navbar-icon-btn" onClick={() => setFamilyUser(null)} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
+              <button className="navbar-icon-btn" onClick={() => { setFamilyUser(null); sessionStorage.removeItem('famSession'); }} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
             </div>
           ) : !user && (
             <button className="navbar-icon-btn" style={{ color: 'var(--primary)' }} onClick={() => setShowFamilyLoginModal(true)} title="Masuk Keluarga">
