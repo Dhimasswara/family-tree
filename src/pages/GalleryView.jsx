@@ -1,6 +1,6 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Image, Send, Trash2, Heart, ChevronDown, ChevronUp, CornerDownRight, MapPin, Crop } from 'lucide-react';
+import { X, Image, Send, Trash2, Heart, ChevronDown, ChevronUp, CornerDownRight, MapPin, Crop, Loader } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 
 // ── Helpers ──
@@ -30,6 +30,88 @@ const getCroppedImg = (imageSrc, pixelCrop) => new Promise((resolve, reject) => 
   image.onerror = reject;
   image.src = imageSrc;
 });
+
+// ── Location Autocomplete ──
+const LocationInput = ({ value, onChange }) => {
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [open, setOpen]               = useState(false);
+  const debounceRef = useRef(null);
+  const wrapRef     = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const search = (q) => {
+    onChange(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.length < 2) { setSuggestions([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1`,
+          { headers: { 'Accept-Language': 'id', 'User-Agent': 'FamTree/1.0' } }
+        );
+        const data = await res.json();
+        setSuggestions(data.map(d => {
+          const a = d.address || {};
+          // Build a concise label: City, Country
+          const parts = [a.city || a.town || a.village || a.county, a.state, a.country].filter(Boolean);
+          return { label: parts.join(', ') || d.display_name, full: d.display_name };
+        }));
+        setOpen(true);
+      } catch (_) {}
+      setLoading(false);
+    }, 550);
+  };
+
+  const pick = (label) => { onChange(label); setSuggestions([]); setOpen(false); };
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-main)', borderRadius: 8, border: '1px solid var(--border-card)', padding: '5px 10px' }}>
+        <MapPin size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+        <input
+          value={value}
+          onChange={e => search(e.target.value)}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          placeholder="Tambah lokasi (opsional)..."
+          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '0.8rem', fontFamily: 'inherit', color: 'var(--text-main)' }}
+        />
+        {loading && <Loader size={11} style={{ color: 'var(--text-muted)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />}
+        {value && !loading && (
+          <button onClick={() => { onChange(''); setSuggestions([]); setOpen(false); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0, display: 'flex', alignItems: 'center' }}>
+            <X size={11}/>
+          </button>
+        )}
+      </div>
+      <AnimatePresence>
+        {open && suggestions.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9999, background: 'var(--bg-card)', border: '1px solid var(--border-card)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', marginTop: 4, overflow: 'hidden' }}>
+            {suggestions.map((s, i) => (
+              <button key={i} onMouseDown={() => pick(s.label)}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%', padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-card)' : 'none' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                <MapPin size={11} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontSize: '0.79rem', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.3 }}>{s.label}</div>
+                  <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', lineHeight: 1.3, marginTop: 1 }}>{s.full}</div>
+                </div>
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 // ── Crop Modal ──
 const CropModal = ({ src, onConfirm, onCancel }) => {
@@ -303,12 +385,8 @@ const GalleryView = ({ posts = [], currentUser, canEdit, onSave }) => {
               />
 
               {/* Location input */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <MapPin size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                <input value={location} onChange={e => setLocation(e.target.value)}
-                  placeholder="Tambah lokasi (opsional)..." className="fi"
-                  style={{ flex: 1, padding: '6px 10px', fontSize: '0.8rem', borderRadius: 8 }}
-                />
+              <div style={{ marginBottom: 10 }}>
+                <LocationInput value={location} onChange={setLocation} />
               </div>
 
               {/* Photo preview */}

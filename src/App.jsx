@@ -301,7 +301,10 @@ const FamilyLoginModal = ({ isOpen, onClose, onLoginSuccess, familyMembers }) =>
 const App = () => {
   const [familyMembers, setFamilyMembers] = useState([]);
 
-  const [view, setView] = useState('tree');
+  const [view, setView] = useState(() => {
+    const saved = localStorage.getItem('lastView');
+    return ['tree','table','gallery'].includes(saved) ? saved : 'tree';
+  });
   const [tableTab, setTableTab] = useState('members'); // 'members', 'birthdays', 'anniversaries'
   const [editingId, setEditingId] = useState(null);
   const [editBuffer, setEditBuffer] = useState({});
@@ -648,12 +651,12 @@ const App = () => {
       .then(({ data }) => { if (data?.gallery) setGalleryPosts(data.gallery); });
   }, [currentFamily?.id]);
 
-  // Stable saveGallery — uses ref to avoid stale closure, so family member posts persist
+  // Stable saveGallery — uses RPC (SECURITY DEFINER) so family members (no auth session) can also save
   const saveGallery = useCallback(async (posts) => {
     setGalleryPosts(posts);
     const fam = currentFamilyRef.current;
     if (supabase && fam?.id) {
-      const { error } = await supabase.from('families').update({ gallery: posts }).eq('id', fam.id);
+      const { error } = await supabase.rpc('save_family_gallery', { p_family_id: fam.id, p_gallery: posts });
       if (error) console.error('Gagal simpan galeri:', error.message);
     }
   }, []);
@@ -704,6 +707,9 @@ const App = () => {
       localStorage.setItem('familyAppConfig', JSON.stringify(appConfig));
     } catch (_) {} // Abaikan QuotaExceededError
   }, [appConfig]);
+
+  // Persist active view across reloads
+  useEffect(() => { localStorage.setItem('lastView', view); }, [view]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
