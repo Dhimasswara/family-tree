@@ -376,7 +376,8 @@ const App = () => {
   const [straightEdges, setStraightEdges] = useState(false);
   const [layoutKey, setLayoutKey] = useState(0); // increment to force re-layout
   const rfRef = useRef(null);
-  const [galleryPosts, setGalleryPosts] = useState([]);
+  const [galleryPosts, setGalleryPosts]   = useState([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
   // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
   const [toast, setToast] = useState(null);
   const [proModal, setProModal] = useState(null);   // { message }
@@ -644,21 +645,37 @@ const App = () => {
   // Keep ref in sync with state
   useEffect(() => { currentFamilyRef.current = currentFamily; }, [currentFamily]);
 
-  // Load gallery dari Supabase (kolom JSON di families)
-  useEffect(() => {
-    if (!supabase || !currentFamily?.id) return;
-    supabase.from('families').select('gallery').eq('id', currentFamily.id).single()
-      .then(({ data }) => { if (data?.gallery) setGalleryPosts(data.gallery); });
-  }, [currentFamily?.id]);
+  // Load gallery dari Supabase — callable as a stable fn (used on mount + view switch)
+  const refreshGallery = useCallback(async (familyId) => {
+    if (!supabase || !familyId) return;
+    setGalleryLoading(true);
+    const { data } = await supabase.from('families').select('gallery').eq('id', familyId).single();
+    if (data && Array.isArray(data.gallery)) setGalleryPosts(data.gallery);
+    else if (data && data.gallery) setGalleryPosts(data.gallery);
+    setGalleryLoading(false);
+  }, []);
 
-  // Stable saveGallery — uses RPC (SECURITY DEFINER) so family members (no auth session) can also save
+  // Load on family mount
+  useEffect(() => {
+    if (currentFamily?.id) refreshGallery(currentFamily.id);
+  }, [currentFamily?.id, refreshGallery]);
+
+  // Re-fetch every time user opens gallery view (keeps it fresh)
+  useEffect(() => {
+    if (view === 'gallery' && currentFamily?.id) refreshGallery(currentFamily.id);
+  }, [view]);
+
+  // Stable saveGallery — tries RPC first (works for family members), falls back to direct update (admin)
   const saveGallery = useCallback(async (posts) => {
     setGalleryPosts(posts);
     const fam = currentFamilyRef.current;
-    if (supabase && fam?.id) {
-      const { error } = await supabase.rpc('save_family_gallery', { p_family_id: fam.id, p_gallery: posts });
-      if (error) console.error('Gagal simpan galeri:', error.message);
-    }
+    if (!supabase || !fam?.id) return;
+    // Try RPC (SECURITY DEFINER — bypasses RLS for family members)
+    const { error: rpcErr } = await supabase.rpc('save_family_gallery', { p_family_id: fam.id, p_gallery: posts });
+    if (!rpcErr) return;
+    // Fallback: direct update (works when admin is logged in via Supabase auth)
+    const { error: updErr } = await supabase.from('families').update({ gallery: posts }).eq('id', fam.id);
+    if (updErr) console.error('Gagal simpan galeri:', updErr.message);
   }, []);
 
   useEffect(() => {
@@ -2214,6 +2231,7 @@ const App = () => {
             <GalleryView
               key="gallery"
               posts={galleryPosts}
+              loading={galleryLoading}
               familyMembers={familyMembers}
               currentUser={user ? { id: user.id, name: user.email?.split('@')[0], isAdmin: true } : familyUser ? { id: familyUser.id, name: familyUser.name, isAdmin: false } : null}
               canEdit={!!(user || familyUser)}

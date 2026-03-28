@@ -285,7 +285,7 @@ const CommentThread = ({ comments = [], currentUser, canAdmin, onUpdate }) => {
 };
 
 // ── Main GalleryView ──
-const GalleryView = ({ posts = [], currentUser, canEdit, onSave }) => {
+const GalleryView = ({ posts = [], loading = false, currentUser, canEdit, onSave }) => {
   const [showForm, setShowForm]     = useState(false);
   const [text, setText]             = useState('');
   const [location, setLocation]     = useState('');
@@ -419,7 +419,12 @@ const GalleryView = ({ posts = [], currentUser, canEdit, onSave }) => {
       </AnimatePresence>
 
       {/* Posts */}
-      {posts.length === 0 ? (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+          <Loader size={28} style={{ animation: 'spin 1s linear infinite', opacity: 0.5, display: 'block', margin: '0 auto 12px' }} />
+          <div style={{ fontSize: '0.82rem' }}>Memuat galeri...</div>
+        </div>
+      ) : posts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '56px 20px', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: '2.6rem', marginBottom: 10 }}>📷</div>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 4 }}>Belum ada cerita</div>
