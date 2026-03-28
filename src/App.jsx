@@ -27,7 +27,7 @@ import * as XLSX from 'xlsx';
 import Cropper from 'react-easy-crop';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
-import { getPlanConfig } from './config/plans';
+import { getPlanConfig, PLANS } from './config/plans';
 
 // Error Boundary sederhana untuk menangkap crash
 class ErrorBoundary extends React.Component {
@@ -2166,7 +2166,6 @@ const App = () => {
 
                   {/* Upgrade Paket */}
                   {(() => {
-                    const { PLANS } = require('./config/plans') || {};
                     const planKeys = ['free','starter','family','unlimited'];
                     return (
                       <div className="glass" style={{ padding: '24px', marginBottom: '20px' }}>
