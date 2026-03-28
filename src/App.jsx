@@ -18,7 +18,8 @@ import { supabase } from './lib/supabase';
 import {
   Plus, Users, User, Table as TableIcon, Share2, Trees,
   Trash2, Edit2, Save, X, Camera, Heart, Baby, Sun, Moon, Search,
-  Divide, Settings, Download, Upload, LogIn, LogOut, Lock, Unlock, ShieldCheck, UserCog
+  Divide, Settings, Download, Upload, LogIn, LogOut, Lock, Unlock, ShieldCheck, UserCog,
+  MapPin, Briefcase, GraduationCap, Phone, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
@@ -423,7 +424,12 @@ const App = () => {
               photo: m.photo,
               father_id: m.fatherId || '',
               mother_id: m.motherId || '',
-              spouses: m.spouses || []
+              spouses: m.spouses || [],
+              address: m.address || '',
+              occupation: m.occupation || '',
+              education: m.education || '',
+              phone: m.phone || '',
+              notes: m.notes || '',
             })));
           
           if (insertError) console.error('Gagal migrasi data:', insertError);
@@ -1080,7 +1086,12 @@ const App = () => {
       fatherId: member.fatherId || '',
       motherId: member.motherId || '',
       spouses: member.spouses || [],
-      photo: member.photo || ''
+      photo: member.photo || '',
+      address: member.address || '',
+      occupation: member.occupation || '',
+      education: member.education || '',
+      phone: member.phone || '',
+      notes: member.notes || '',
     });
   }, []);
   const handleSave = () => {
@@ -2338,6 +2349,88 @@ const App = () => {
                 </div>
               </div>
             </div>
+
+              {/* Seksi Informasi Tambahan */}
+              <div className="form-section">
+                <div className="section-title"><FileText size={18} /> Informasi Tambahan <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}>(opsional)</span></div>
+
+                <div className="form-group">
+                  <label className="form-label"><MapPin size={13} style={{ display: 'inline', marginRight: 4 }} />Alamat</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                    <textarea
+                      readOnly={!user}
+                      rows={2}
+                      value={editBuffer.address}
+                      onChange={e => setEditBuffer({ ...editBuffer, address: e.target.value })}
+                      className="glass"
+                      style={{ flex: 1, padding: '10px', background: 'var(--control-bg)', color: 'inherit', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.9rem' }}
+                      placeholder="Contoh: Jl. Merdeka No. 10, Jakarta Selatan"
+                    />
+                    {editBuffer.address && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(editBuffer.address)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn glass"
+                        style={{ padding: '10px', flexShrink: 0, color: '#0ea5e9', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', textDecoration: 'none' }}
+                        title="Buka di Google Maps"
+                      >
+                        <MapPin size={14} /> Maps
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label"><Briefcase size={13} style={{ display: 'inline', marginRight: 4 }} />Pekerjaan</label>
+                    <input
+                      readOnly={!user}
+                      value={editBuffer.occupation}
+                      onChange={e => setEditBuffer({ ...editBuffer, occupation: e.target.value })}
+                      className="glass"
+                      style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}
+                      placeholder="Contoh: Dokter, Guru, Wiraswasta..."
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label"><GraduationCap size={13} style={{ display: 'inline', marginRight: 4 }} />Pendidikan Terakhir</label>
+                    <input
+                      readOnly={!user}
+                      value={editBuffer.education}
+                      onChange={e => setEditBuffer({ ...editBuffer, education: e.target.value })}
+                      className="glass"
+                      style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}
+                      placeholder="Contoh: S1 Teknik, SMA Negeri 1..."
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label"><Phone size={13} style={{ display: 'inline', marginRight: 4 }} />No. Telepon / HP</label>
+                  <input
+                    readOnly={!user}
+                    value={editBuffer.phone}
+                    onChange={e => setEditBuffer({ ...editBuffer, phone: e.target.value })}
+                    className="glass"
+                    style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit' }}
+                    placeholder="Contoh: 08123456789"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label"><FileText size={13} style={{ display: 'inline', marginRight: 4 }} />Catatan</label>
+                  <textarea
+                    readOnly={!user}
+                    rows={3}
+                    value={editBuffer.notes}
+                    onChange={e => setEditBuffer({ ...editBuffer, notes: e.target.value })}
+                    className="glass"
+                    style={{ width: '100%', padding: '10px', background: 'var(--control-bg)', color: 'inherit', resize: 'vertical', fontFamily: 'inherit', fontSize: '0.9rem' }}
+                    placeholder="Cerita singkat, prestasi, atau hal penting lainnya..."
+                  />
+                </div>
+              </div>
 
             <div className="modal-footer">
               {user ? (

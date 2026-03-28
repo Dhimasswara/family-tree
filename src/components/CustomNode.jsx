@@ -75,6 +75,35 @@ const FamilyMemberNode = ({ data }) => {
                             {data.nasabLabel}
                         </div>
                     )}
+                    <div style={{
+                        marginTop: '4px',
+                        fontSize: '0.62rem',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        color: isDeceased ? '#94a3b8' : '#22c55e',
+                    }}>
+                        <span style={{
+                            width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+                            background: isDeceased ? '#94a3b8' : '#22c55e',
+                            boxShadow: isDeceased ? 'none' : '0 0 4px #22c55e',
+                        }} />
+                        {isDeceased ? (data.gender === 'female' ? 'Almarhumah' : 'Almarhum') : 'Masih Hidup'}
+                    </div>
+                    {data.occupation && (
+                        <div style={{
+                            marginTop: '3px',
+                            fontSize: '0.62rem',
+                            opacity: 0.65,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '130px',
+                        }}>
+                            💼 {data.occupation}
+                        </div>
+                    )}
                 </div>
             </div>
 
