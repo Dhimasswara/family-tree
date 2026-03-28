@@ -108,9 +108,11 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
         .select('id, name, gender, photo, pin')
         .eq('family_id', fam.id)
         .order('name');
-      if (memErr) throw memErr;
 
-      setMemberList({ family: fam, members: members || [] });
+      if (memErr) throw new Error(`Gagal ambil anggota: ${memErr.message}`);
+      if (!members || members.length === 0) throw new Error(`Keluarga ditemukan (${fam.name}) tapi belum ada anggota terdaftar. Pastikan admin sudah menambahkan anggota.`);
+
+      setMemberList({ family: fam, members });
     } catch (err) {
       setError(err.message);
     } finally { setLoadingFamily(false); }
