@@ -763,41 +763,79 @@ const App = () => {
     }, 1000);
   };
 
-  // ── Gallery notifications: detect new posts, likes, comments ──
+  // ── Notifications: load from DB on family login ──
+  useEffect(() => {
+    const fid = currentFamily?.id;
+    const myId = user?.id || familyUser?.id;
+    if (!supabase || !fid || !myId) return;
+    supabase.from('notifications').select('*').eq('family_id', fid).eq('user_id', myId)
+      .order('time', { ascending: false }).limit(30)
+      .then(({ data }) => { if (data) setNotifications(data); });
+  }, [currentFamily?.id, user?.id, familyUser?.id]);
+
+  // ── Gallery notifications: detect new posts, likes, comments, replies ──
   useEffect(() => {
     if (galleryLoading) return;
     const myId = user?.id || familyUser?.id;
+    const fid = currentFamily?.id;
     if (!myId) return;
     const prev = prevGalleryPostsRef.current;
     if (prev === null) { prevGalleryPostsRef.current = galleryPosts; return; }
 
     const newNotifs = [];
+    let seq = 0;
+    const mkId = () => `n_${Date.now()}_${seq++}`;
+    const now = new Date().toISOString();
+
     galleryPosts.forEach(post => {
       const old = prev.find(p => p.id === post.id);
       if (!old) {
         // New post by someone else
         if (post.author_id !== myId) {
-          newNotifs.push({ id: `n${Date.now()}${Math.random()}`, type: 'post', text: `${post.author_name} menambahkan postingan baru`, time: new Date().toISOString(), read: false });
+          newNotifs.push({ id: mkId(), type: 'post', text: `${post.author_name} menambahkan postingan baru`, time: now, read: false });
         }
-      } else if (post.author_id === myId) {
-        // New like on my post
-        const oldLikes = old.liked_by || [];
-        const newLikes = post.liked_by || [];
-        const added = newLikes.filter(id => !oldLikes.includes(id) && id !== myId);
-        if (added.length > 0) {
-          newNotifs.push({ id: `n${Date.now()}${Math.random()}`, type: 'like', text: `Seseorang menyukai postinganmu`, time: new Date().toISOString(), read: false });
-        }
-        // New comment on my post
-        const oldComments = old.comments || [];
-        const newComments = post.comments || [];
-        const addedComments = newComments.filter(c => !oldComments.find(oc => oc.id === c.id) && c.authorId !== myId);
-        addedComments.forEach(c => {
-          newNotifs.push({ id: `n${Date.now()}${Math.random()}`, type: 'comment', text: `${c.authorName} mengomentari postinganmu`, time: new Date().toISOString(), read: false });
-        });
+        return;
       }
+
+      // Likes on my post
+      if (post.author_id === myId) {
+        const added = (post.liked_by || []).filter(id => !(old.liked_by || []).includes(id) && id !== myId);
+        if (added.length > 0) {
+          newNotifs.push({ id: mkId(), type: 'like', text: `Seseorang menyukai postinganmu`, time: now, read: false });
+        }
+      }
+
+      // Comments & replies
+      const oldComments = old.comments || [];
+      const newComments = post.comments || [];
+
+      newComments.forEach(newC => {
+        const oldC = oldComments.find(oc => oc.id === newC.id);
+        if (!oldC) {
+          // New top-level comment
+          if (post.author_id === myId && newC.authorId !== myId) {
+            newNotifs.push({ id: mkId(), type: 'comment', text: `${newC.authorName} mengomentari postinganmu`, time: now, read: false });
+          }
+        } else {
+          // New replies
+          const addedReplies = (newC.replies || []).filter(r => !(oldC.replies || []).find(or => or.id === r.id) && r.authorId !== myId);
+          addedReplies.forEach(r => {
+            if (newC.authorId === myId) {
+              newNotifs.push({ id: mkId(), type: 'reply', text: `${r.authorName} membalas komentarmu`, time: now, read: false });
+            } else if (post.author_id === myId) {
+              newNotifs.push({ id: mkId(), type: 'reply', text: `${r.authorName} membalas di postinganmu`, time: now, read: false });
+            }
+          });
+        }
+      });
     });
 
-    if (newNotifs.length > 0) setNotifications(prev => [...newNotifs, ...prev].slice(0, 30));
+    if (newNotifs.length > 0) {
+      setNotifications(prev => [...newNotifs, ...prev].slice(0, 30));
+      if (supabase && fid) {
+        supabase.from('notifications').insert(newNotifs.map(n => ({ ...n, family_id: fid, user_id: myId })));
+      }
+    }
     prevGalleryPostsRef.current = galleryPosts;
   }, [galleryPosts]);
 
@@ -2244,7 +2282,15 @@ const App = () => {
         <div className="navbar-actions">
           {/* Notification Bell */}
           <div style={{ position: 'relative' }}>
-            <button className="navbar-icon-btn" onClick={() => { setNotifOpen(o => !o); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }} title="Notifikasi">
+            <button className="navbar-icon-btn" onClick={() => {
+              setNotifOpen(o => !o);
+              const unread = notifications.filter(n => !n.read);
+              if (unread.length > 0) {
+                setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                const fid = currentFamily?.id; const myId = user?.id || familyUser?.id;
+                if (supabase && fid && myId) supabase.from('notifications').update({ read: true }).eq('family_id', fid).eq('user_id', myId).eq('read', false);
+              }
+            }} title="Notifikasi">
               <Bell size={16} />
               {notifications.filter(n => !n.read).length > 0 && (
                 <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', border: '1.5px solid var(--bg-header)' }} />
@@ -2255,7 +2301,11 @@ const App = () => {
                 onMouseLeave={() => setNotifOpen(false)}>
                 <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: '0.85rem', borderBottom: '1px solid var(--border-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Notifikasi</span>
-                  {notifications.length > 0 && <button onClick={() => setNotifications([])} style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Hapus semua</button>}
+                  {notifications.length > 0 && <button onClick={() => {
+                    setNotifications([]);
+                    const fid = currentFamily?.id; const myId = user?.id || familyUser?.id;
+                    if (supabase && fid && myId) supabase.from('notifications').delete().eq('family_id', fid).eq('user_id', myId);
+                  }} style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Hapus semua</button>}
                 </div>
                 <div style={{ maxHeight: 320, overflowY: 'auto' }}>
                   {notifications.length === 0 ? (
@@ -2266,7 +2316,7 @@ const App = () => {
                   ) : notifications.map(n => (
                     <div key={n.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-card)', display: 'flex', gap: 10, alignItems: 'flex-start', background: n.read ? 'transparent' : 'rgba(14,165,233,0.06)' }}>
                       <div style={{ width: 30, height: 30, borderRadius: 8, background: n.type === 'post' ? 'rgba(99,102,241,0.15)' : n.type === 'like' ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.9rem' }}>
-                        {n.type === 'post' ? '📸' : n.type === 'like' ? '❤️' : '💬'}
+                        {n.type === 'post' ? '📸' : n.type === 'like' ? '❤️' : n.type === 'reply' ? '↩️' : '💬'}
                       </div>
                       <div>
                         <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.4 }}>{n.text}</div>
