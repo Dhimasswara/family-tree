@@ -1172,13 +1172,22 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
   #app-main { padding-bottom: 62px; }
 
   /* ── Navbar ── */
-  .app-navbar { padding: 0 12px; gap: 6px; height: 52px; justify-content: space-between; }
+  .app-navbar { padding: 0 12px; gap: 6px; height: 52px; }
   .navbar-views { display: none !important; }
   .navbar-sub { display: none; }
   .navbar-title { font-size: 0.88rem; }
-  .navbar-brand { gap: 8px; flex-shrink: 1; min-width: 0; }
+  .navbar-brand { gap: 8px; flex-shrink: 1; min-width: 0; max-width: calc(100% - 90px); overflow: hidden; }
   .navbar-logo-icon, .navbar-logo-img { width: 30px; height: 30px; }
-  .navbar-actions { gap: 3px; flex-shrink: 0; }
+  /* Absolute-pin bell + avatar to top-right of navbar */
+  .navbar-actions {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
   .navbar-icon-btn { width: 32px; height: 32px; }
   .navbar-user-chip { max-width: 110px; padding: 3px 6px 3px 3px; gap: 4px; }
   .navbar-user-chip span { max-width: 55px; }
