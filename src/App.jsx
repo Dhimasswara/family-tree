@@ -2297,7 +2297,7 @@ const App = () => {
               )}
             </button>
             {notifOpen && (
-              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 300, background: 'var(--bg-card)', border: '1px solid var(--border-card)', borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 9999, overflow: 'hidden' }}
+              <div style={{ position: 'fixed', right: 12, top: 60, width: 'min(300px, calc(100vw - 24px))', background: 'var(--bg-card)', border: '1px solid var(--border-card)', borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 9999, overflow: 'hidden' }}
                 onMouseLeave={() => setNotifOpen(false)}>
                 <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: '0.85rem', borderBottom: '1px solid var(--border-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Notifikasi</span>
@@ -2334,7 +2334,7 @@ const App = () => {
           <button className="navbar-icon-btn" onClick={toggleTheme} title="Tema">
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
-          <button className="navbar-icon-btn" style={{ color: 'var(--primary)' }} onClick={() => {
+          <button className="navbar-icon-btn kinship-btn" style={{ color: 'var(--primary)' }} onClick={() => {
             if (!planConfig.features.kinship) { openProModal('Fitur Kalkulator Nasab tersedia di paket Starter ke atas.'); return; }
             setShowKinshipModal(true);
           }} title="Kalkulator Nasab">
@@ -2426,7 +2426,7 @@ const App = () => {
         </div>
       )}
 
-      <main style={{ flex: 1, position: 'relative', overflowY: view !== 'tree' ? 'auto' : 'hidden' }}>
+      <main id="app-main" style={{ flex: 1, position: 'relative', overflowY: view !== 'tree' ? 'auto' : 'hidden' }}>
         
 <AnimatePresence mode="wait">
           {view === 'tree' ? (
@@ -2459,7 +2459,7 @@ const App = () => {
                     }}
                     style={{ background: straightEdges ? 'var(--primary)' : 'var(--bg-card)', color: straightEdges ? 'white' : 'var(--text-main)', border: '1px solid var(--border-card)', borderRadius: 9, padding: '7px 12px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', fontFamily: 'Outfit, sans-serif', whiteSpace: 'nowrap' }}
                   >
-                    ↔ {straightEdges ? 'Lurus' : 'Rapihkan'}
+                    ↔ <span className="tree-panel-label">{straightEdges ? 'Lurus' : 'Rapihkan'}</span>
                   </button>
                   <button
                     className="tree-panel-btn"
@@ -2467,7 +2467,7 @@ const App = () => {
                     onClick={handleDownloadTree}
                     style={{ background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-card)', borderRadius: 9, padding: '7px 12px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', fontFamily: 'Outfit, sans-serif', whiteSpace: 'nowrap' }}
                   >
-                    ⬇ Unduh
+                    ⬇ <span className="tree-panel-label">Unduh</span>
                   </button>
                 </Panel>
               </ReactFlow>
@@ -2482,7 +2482,7 @@ const App = () => {
               canEdit={!!(user || familyUser)}
             />
           ) : ((userRole === 'super_admin' || userRole === 'admin') && view === 'settings') ? (
-            <motion.div key="settings" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+            <motion.div key="settings" className="settings-wrap" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
                <div className="glass" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h2 style={{ marginBottom: '10px' }}>Pengaturan Aplikasi</h2>
@@ -3064,6 +3064,41 @@ const App = () => {
           )}
         </AnimatePresence>
       </main>
+
+      {/* ── Bottom Navigation (mobile only) ── */}
+      <nav className="bottom-nav">
+        <div className="bottom-nav-inner">
+          <button className={`bottom-nav-tab ${view === 'tree' ? 'active' : ''}`} onClick={() => setView('tree')}>
+            <Trees size={20} />
+            Pohon
+          </button>
+          <button className={`bottom-nav-tab ${view === 'gallery' ? 'active' : ''}`} onClick={() => {
+            if (authReady && !planConfig.features.kinship) { openProModal('Fitur Galeri tersedia di paket Starter ke atas.'); return; }
+            setView('gallery');
+          }}>
+            <Camera size={20} />
+            {notifications.filter(n => !n.read).length > 0 && view !== 'gallery' && <span className="bnav-badge" />}
+            Galeri
+          </button>
+          <button className={`bottom-nav-tab ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>
+            <TableIcon size={20} />
+            Tabel
+          </button>
+          <button className="bottom-nav-tab" onClick={() => {
+            if (authReady && !planConfig.features.maps) { openProModal('Fitur Peta tersedia di paket Starter ke atas.'); return; }
+            setShowMapView(true);
+          }}>
+            <MapPin size={20} />
+            Peta
+          </button>
+          {(userRole === 'super_admin' || userRole === 'admin') && (
+            <button className={`bottom-nav-tab ${view === 'settings' ? 'active' : ''}`} onClick={() => setView(view === 'settings' ? 'tree' : 'settings')}>
+              <Settings size={20} />
+              Atur
+            </button>
+          )}
+        </div>
+      </nav>
 
       <LoginModal
         isOpen={showLoginModal}

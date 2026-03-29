@@ -1100,3 +1100,106 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
 .leaflet-container { font-family: 'Outfit', sans-serif !important; }
 .leaflet-popup-content-wrapper { border-radius: 14px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important; }
 .leaflet-popup-content { margin: 12px 14px !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   BOTTOM NAV  (mobile tab bar, hidden on desktop)
+══════════════════════════════════════════════════════════════ */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--bg-header);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-card);
+  z-index: 300;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.bottom-nav-inner {
+  display: flex;
+  height: 54px;
+}
+.bottom-nav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.59rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+  padding: 6px 2px;
+  letter-spacing: 0.01em;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+}
+.bottom-nav-tab svg { transition: transform 0.15s; flex-shrink: 0; }
+.bottom-nav-tab.active { color: var(--primary); }
+.bottom-nav-tab.active svg { transform: scale(1.15); }
+.bottom-nav-tab .bnav-badge {
+  position: absolute;
+  top: 7px;
+  left: calc(50% + 6px);
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 1.5px solid var(--bg-header);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — max-width: 640px
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Bottom nav */
+  .bottom-nav { display: block; }
+
+  /* Push content above bottom nav */
+  #app-main { padding-bottom: 62px; }
+
+  /* ── Navbar ── */
+  .app-navbar { padding: 0 12px; gap: 6px; height: 52px; }
+  .navbar-views { display: none !important; }
+  .navbar-sub { display: none; }
+  .navbar-title { font-size: 0.88rem; }
+  .navbar-brand { gap: 8px; }
+  .navbar-logo-icon, .navbar-logo-img { width: 30px; height: 30px; }
+  .navbar-actions { gap: 3px; }
+  .navbar-icon-btn { width: 32px; height: 32px; }
+  .navbar-user-chip { max-width: 110px; padding: 3px 6px 3px 3px; gap: 4px; }
+  .navbar-user-chip span { max-width: 55px; }
+  .navbar-user-avatar { width: 22px; height: 22px; }
+  .kinship-btn { display: none !important; }
+
+  /* ── Stats ribbon ── */
+  .stats-ribbon { padding: 7px 10px; gap: 7px; }
+  .stat-chip { padding: 5px 9px; }
+  .stat-value { font-size: 1rem; }
+  .stat-label { font-size: 0.65rem; }
+
+  /* ── Table ── */
+  .table-wrapper { min-width: 560px; }
+
+  /* ── Glass ── */
+  .glass { border-radius: 11px; }
+
+  /* ── Settings page ── */
+  .settings-wrap { padding: 12px !important; }
+  .settings-wrap > .glass { padding: 18px !important; gap: 16px !important; }
+
+  /* ── Form grid: always single column on mobile ── */
+  .form-grid { grid-template-columns: 1fr !important; }
+  .spouse-card-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* ── Tree panel buttons: icon only ── */
+  .tree-panel-label { display: none; }
+
+  /* ── Login / auth button in navbar ── */
+  .navbar-login-btn span { display: none; }
+  .navbar-login-btn { padding: 0 !important; width: 32px; height: 32px; border-radius: 9px; justify-content: center; }
+}
