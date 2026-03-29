@@ -689,9 +689,11 @@ const App = () => {
         const syncToSupabase = async () => {
             if (!supabase || !currentFamily?.id) return;
             try {
+                const membersToSync = familyMembers.filter(m => !m._isNew);
+                if (membersToSync.length === 0 && familyMembers.length > 0) return; // only new unsaved members, skip
                 const { error } = await supabase
                     .from('family_members')
-                    .upsert(familyMembers.map(m => ({
+                    .upsert(membersToSync.map(m => ({
                         id: m.id,
                         name: m.name,
                         gender: m.gender,
@@ -741,6 +743,22 @@ const App = () => {
       if (fid) supabase.from('families').update({ config: appConfig }).eq('id', fid);
     }, 1200); // debounce 1.2s
   }, [appConfig, user]);
+
+  const [familyNameEdit, setFamilyNameEdit] = useState('');
+  useEffect(() => {
+    if (currentFamily?.name) setFamilyNameEdit(currentFamily.name);
+  }, [currentFamily?.id]);
+  const familyNameSaveTimer = useRef(null);
+  const handleFamilyNameChange = (val) => {
+    setFamilyNameEdit(val);
+    setCurrentFamily(prev => prev ? { ...prev, name: val } : prev);
+    clearTimeout(familyNameSaveTimer.current);
+    familyNameSaveTimer.current = setTimeout(async () => {
+      const fid = currentFamily?.id;
+      if (!fid || !supabase) return;
+      await supabase.from('families').update({ name: val }).eq('id', fid);
+    }, 1000);
+  };
 
   // ── Families realtime: plan + config instantly pushed to all open sessions ──
   useEffect(() => {
@@ -1498,7 +1516,7 @@ const App = () => {
     let updatedMembers;
     setFamilyMembers(prev => {
       updatedMembers = prev.map(m => {
-        if (m.id === editingId) return { ...editBuffer };
+        if (m.id === editingId) { const { _isNew, ...saved } = editBuffer; return saved; }
 
         let mSpouses = [...(m.spouses || [])];
         let hasChanged = false;
@@ -1598,11 +1616,11 @@ const App = () => {
       fatherId: '',
       motherId: '',
       spouses: [],
-      photo: ''
+      photo: '',
+      _isNew: true,
     };
     setFamilyMembers(prev => [...prev, newMember]);
-    // Mark as new so Cancel removes it instead of keeping an empty member
-    setEditBuffer({ ...newMember, _isNew: true });
+    setEditBuffer({ ...newMember });
     setEditingId(id);
     setEditModalTab('biodata');
   };
@@ -2342,6 +2360,11 @@ const App = () => {
                     </span>
                   </div>
                   
+                  <div>
+                    <label style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: '8px', display: 'block' }}>Nama Keluarga</label>
+                    <input type="text" value={familyNameEdit} onChange={e => handleFamilyNameChange(e.target.value)} className="glass" style={{ width: '100%', padding: '12px' }} placeholder="Masukkan nama keluarga..." />
+                  </div>
+
                   <div>
                     <label style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: '8px', display: 'block' }}>Nama Aplikasi</label>
                     <input type="text" value={appConfig.appName} onChange={e => setAppConfig({...appConfig, appName: e.target.value})} className="glass" style={{ width: '100%', padding: '12px' }} />
