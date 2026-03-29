@@ -1017,7 +1017,8 @@ const App = () => {
     });
 
     const isRapih = layoutKey > 0;
-    dagreGraph.setGraph({ rankdir: 'TB', ranksep: isRapih ? 110 : 90, nodesep: isRapih ? 70 : 50, align: isRapih ? 'UL' : undefined });
+    // Compact mode: kurangi jarak antar rank & node agar garis lebih pendek
+    dagreGraph.setGraph({ rankdir: 'TB', ranksep: isRapih ? 55 : 90, nodesep: isRapih ? 30 : 50 });
 
     const getTotalSpouseCount = (id, visited = new Set()) => {
         if (visited.has(id)) return 0;
@@ -2454,7 +2455,8 @@ const App = () => {
                     onClick={() => {
                       const next = !straightEdges;
                       setStraightEdges(next);
-                      if (next) setLayoutKey(k => k + 1); // force fresh dagre layout
+                      // compact on → increment, compact off → reset ke normal spacing
+                      setLayoutKey(k => next ? k + 1 : 0);
                       setTimeout(() => rfRef.current?.fitView({ duration: 600, padding: 0.15 }), 80);
                     }}
                     style={{ background: straightEdges ? 'var(--primary)' : 'var(--bg-card)', color: straightEdges ? 'white' : 'var(--text-main)', border: '1px solid var(--border-card)', borderRadius: 9, padding: '7px 12px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', fontFamily: 'Outfit, sans-serif', whiteSpace: 'nowrap' }}
