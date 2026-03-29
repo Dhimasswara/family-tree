@@ -2836,7 +2836,7 @@ const App = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="table-btns-row" style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
                   {user && (
                     <button className="btn btn-primary" onClick={() => {
                       if (!canAddMember) {
@@ -2848,9 +2848,9 @@ const App = () => {
                       <Plus size={16} /> <span className="btn-text">Tambah Anggota</span>
                     </button>
                   )}
-                  
+
                   <div className="table-tabs-container" style={{ display: 'flex', background: 'rgba(0,0,0,0.05)', padding: '4px', borderRadius: '12px', gap: '4px', width: 'fit-content' }}>
-                      <button className={`btn ${tableTab === 'members' ? 'btn-primary' : 'glass'}`} onClick={() => setTableTab('members')}>Data Anggota</button>
+                      <button className={`btn ${tableTab === 'members' ? 'btn-primary' : 'glass'}`} onClick={() => setTableTab('members')}><span className="desktop-label">Data Anggota</span><span className="mobile-label">Data</span></button>
                       <button className={`btn ${tableTab === 'birthdays' ? 'btn-primary' : 'glass'}`} onClick={() => setTableTab('birthdays')}>
                         🎂 <span className="desktop-label">Ulang Tahun</span><span className="mobile-label">Ultah</span>
                       </button>

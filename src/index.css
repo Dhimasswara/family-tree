@@ -1220,7 +1220,10 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
   .table-action-row { gap: 10px !important; }
   .table-action-row > div:last-child { width: 100%; }
   .search-container-wrapper { min-width: 0 !important; }
-  .table-tabs-container { width: 100% !important; }
+  /* Tombol tambah + tabs sejajar satu baris */
+  .table-btns-row { flex-wrap: nowrap !important; gap: 6px !important; width: 100%; align-items: center; }
+  .table-btns-row .btn.btn-primary { flex-shrink: 0; padding: 7px 10px !important; }
+  .table-btns-row .table-tabs-container { width: auto !important; flex: 1; justify-content: flex-start !important; }
   .table-tabs-container .btn { flex: 1; font-size: 0.72rem; padding: 7px 4px !important; }
   .table-glass { padding: 12px !important; }
 
