@@ -557,9 +557,18 @@ const App = () => {
         // supaya tidak trigger fetchData dua kali saat login baru (onLoginSuccess sudah set ini)
         setCurrentFamily(prev => (prev?.id === fam.id ? prev : fam));
         setUserPlan(fam.plan || 'free');
-        // Load appConfig saved by admin (so all devices see same app name/logo)
         if (fam.config && Object.keys(fam.config).length > 0) {
+          // Config already in DB — apply to state
           setAppConfig(prev => ({ ...prev, ...fam.config }));
+        } else {
+          // Config column is empty — push current localStorage config to DB now
+          // so family members can receive it
+          try {
+            const localCfg = JSON.parse(localStorage.getItem('familyAppConfig') || 'null');
+            if (localCfg && fam.id) {
+              supabase.from('families').update({ config: localCfg }).eq('id', fam.id);
+            }
+          } catch (_) {}
         }
       }
     } catch (_) {}
@@ -783,7 +792,11 @@ const App = () => {
         ({ new: row }) => setGalleryPosts(prev =>
           prev.some(p => p.id === row.id) ? prev : [row, ...prev]))
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${fid}` },
-        ({ new: row }) => setGalleryPosts(prev => prev.map(p => p.id === row.id ? row : p)))
+        ({ new: row }) => setGalleryPosts(prev => prev.map(p => {
+          if (p.id !== row.id) return p;
+          // Supabase realtime may drop large base64 photo from payload — preserve existing
+          return { ...p, ...row, photo: row.photo !== undefined ? row.photo : p.photo };
+        })))
       // DELETE: no filter — old record only has PK (id) without REPLICA IDENTITY FULL
       // We guard against cross-family deletes by only removing ids we actually have
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'gallery_posts' },
@@ -1587,10 +1600,19 @@ const App = () => {
       spouses: [],
       photo: ''
     };
-
-    // Gunakan state update teratur
     setFamilyMembers(prev => [...prev, newMember]);
-    handleEdit(newMember);
+    // Mark as new so Cancel removes it instead of keeping an empty member
+    setEditBuffer({ ...newMember, _isNew: true });
+    setEditingId(id);
+    setEditModalTab('biodata');
+  };
+
+  const handleCancelEdit = () => {
+    // If cancelling a brand-new unsaved member, remove it from the list
+    if (editBuffer?._isNew) {
+      setFamilyMembers(prev => prev.filter(m => m.id !== editingId));
+    }
+    setEditingId(null);
   };
 
   const handleImageUpload = (e) => {
@@ -3101,7 +3123,7 @@ const App = () => {
               className="modal-container"
             >
               {/* Floating close */}
-              <button className="modal-close-btn" onClick={() => setEditingId(null)}>
+              <button className="modal-close-btn" onClick={handleCancelEdit}>
                 <X size={17} />
               </button>
 
@@ -3433,7 +3455,7 @@ const App = () => {
               <div className="modal-footer">
                 {user ? (
                   <>
-                    <button className="btn glass" style={{ padding: '11px 22px' }} onClick={() => setEditingId(null)}>Batal</button>
+                    <button className="btn glass" style={{ padding: '11px 22px' }} onClick={handleCancelEdit}>Batal</button>
                     <button className="btn btn-primary" style={{ padding: '11px 22px' }} onClick={handleSave}>
                       <Save size={16} /> Simpan
                     </button>
