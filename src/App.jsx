@@ -387,6 +387,13 @@ const App = () => {
   const [confirmModal, setConfirmModal] = useState(null); // { message, onConfirm }
   // View modal (klik node di tree)
   const [viewTarget, setViewTarget] = useState(null);
+  // Admin profile edit
+  const [profileName,        setProfileName]        = useState('');
+  const [profileEmail,       setProfileEmail]       = useState('');
+  const [profilePwd,         setProfilePwd]         = useState('');
+  const [profilePwdConfirm,  setProfilePwdConfirm]  = useState('');
+  const [profileSaving,      setProfileSaving]      = useState(false);
+  const [profileMsg,         setProfileMsg]         = useState(null);
   // Page routing: 'loading' | 'landing' | 'auth' | 'app'
   // Start 'app' if family session cached → no flash of landing page
   const [appPage, setAppPage] = useState(() => {
@@ -636,6 +643,49 @@ const App = () => {
     setCurrentFamily(null);
     setAppPage('landing');
     setView('tree');
+  };
+
+  // Sync profil form saat user login/berubah
+  useEffect(() => {
+    if (user) {
+      setProfileEmail(user.email || '');
+      setProfileName(user.user_metadata?.full_name || user.email?.split('@')[0] || '');
+    }
+  }, [user?.id]);
+
+  const handleSaveProfile = async () => {
+    if (!supabase || !user) return;
+    if (profilePwd && profilePwd !== profilePwdConfirm) {
+      setProfileMsg({ type: 'error', text: 'Konfirmasi password tidak cocok.' });
+      return;
+    }
+    if (profilePwd && profilePwd.length < 6) {
+      setProfileMsg({ type: 'error', text: 'Password minimal 6 karakter.' });
+      return;
+    }
+    setProfileSaving(true);
+    setProfileMsg(null);
+    const updates = {};
+    if (profileEmail && profileEmail !== user.email) updates.email = profileEmail;
+    if (profilePwd) updates.password = profilePwd;
+    const newName = profileName.trim();
+    if (newName && newName !== (user.user_metadata?.full_name || '')) {
+      updates.data = { full_name: newName };
+    }
+    if (Object.keys(updates).length === 0) {
+      setProfileMsg({ type: 'error', text: 'Tidak ada perubahan.' });
+      setProfileSaving(false);
+      return;
+    }
+    const { error } = await supabase.auth.updateUser(updates);
+    setProfileSaving(false);
+    if (error) {
+      setProfileMsg({ type: 'error', text: error.message });
+    } else {
+      setProfileMsg({ type: 'success', text: 'Profil berhasil diperbarui.' });
+      setProfilePwd('');
+      setProfilePwdConfirm('');
+    }
   };
 
   // Fungsi Fetch Data dari Supabase
@@ -912,12 +962,15 @@ const App = () => {
   const getLayoutedElementsLocal = (nodesParam, edgesParam) => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
-    
-    // Sesuaikan parameter tinggi Box dengan render asli untuk mencegah jarak yang terlalu ngangkang
-    const nodeWidth = 152;
-    const nodeHeight = 145;
 
-    const spacingX = nodeWidth + 80; // Standard Dagre nodesep
+    const isRapih = layoutKey > 0;
+
+    // Sesuaikan parameter tinggi Box dengan render asli
+    const nodeWidth  = 158;
+    const nodeHeight = isRapih ? 130 : 145;
+
+    // Compact mode: spacingX pasangan jauh lebih kecil agar garis horizontal memendek
+    const spacingX = isRapih ? nodeWidth + 25 : nodeWidth + 80;
     
     // Kalkulasi Jarak Darah (Bloodline Distance) dengan BFS untuk menentukan Tuan Rumah vs Pendatang (In-laws) sejati
     const bloodlineDist = {};
@@ -1016,9 +1069,8 @@ const App = () => {
         }
     });
 
-    const isRapih = layoutKey > 0;
-    // Compact mode: kurangi jarak antar rank & node agar garis lebih pendek
-    dagreGraph.setGraph({ rankdir: 'TB', ranksep: isRapih ? 55 : 90, nodesep: isRapih ? 30 : 50 });
+    // Compact mode: ranksep & nodesep jauh lebih kecil → garis pendek & rapat
+    dagreGraph.setGraph({ rankdir: 'TB', ranksep: isRapih ? 38 : 90, nodesep: isRapih ? 18 : 50 });
 
     const getTotalSpouseCount = (id, visited = new Set()) => {
         if (visited.has(id)) return 0;
@@ -2794,6 +2846,61 @@ const App = () => {
 
                   <div style={{ textAlign: 'right', marginTop: '10px' }}>
                      <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Perubahan pengaturan otomatis disimpan seketika ke Database Lokal.</p>
+                  </div>
+
+                  {/* ── Profil Admin ── */}
+                  <div className="settings-inner-glass" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <UserCog size={16} style={{ color: 'var(--primary)' }} />
+                      <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Profil Admin</span>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.8rem', opacity: 0.65, display: 'block', marginBottom: 6 }}>Nama Tampilan</label>
+                      <input className="glass" style={{ width: '100%', padding: '10px 12px' }}
+                        placeholder="Nama tampilan…"
+                        value={profileName}
+                        onChange={e => setProfileName(e.target.value)} />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.8rem', opacity: 0.65, display: 'block', marginBottom: 6 }}>Email / Username</label>
+                      <input className="glass" style={{ width: '100%', padding: '10px 12px' }}
+                        type="email" placeholder="Email…"
+                        value={profileEmail}
+                        onChange={e => setProfileEmail(e.target.value)} />
+                    </div>
+
+                    <div className="settings-pin-row" style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.8rem', opacity: 0.65, display: 'block', marginBottom: 6 }}>Password Baru</label>
+                        <input className="glass" style={{ width: '100%', padding: '10px 12px' }}
+                          type="password" placeholder="Kosongkan jika tidak diubah"
+                          value={profilePwd}
+                          onChange={e => setProfilePwd(e.target.value)} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.8rem', opacity: 0.65, display: 'block', marginBottom: 6 }}>Konfirmasi Password</label>
+                        <input className="glass" style={{ width: '100%', padding: '10px 12px' }}
+                          type="password" placeholder="Ulangi password baru"
+                          value={profilePwdConfirm}
+                          onChange={e => setProfilePwdConfirm(e.target.value)} />
+                      </div>
+                    </div>
+
+                    {profileMsg && (
+                      <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600,
+                        background: profileMsg.type === 'success' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
+                        color: profileMsg.type === 'success' ? '#16a34a' : '#ef4444',
+                        border: `1px solid ${profileMsg.type === 'success' ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.2)'}` }}>
+                        {profileMsg.text}
+                      </div>
+                    )}
+
+                    <button className="btn btn-primary" style={{ alignSelf: 'flex-end' }}
+                      onClick={handleSaveProfile} disabled={profileSaving}>
+                      <Save size={14} /> {profileSaving ? 'Menyimpan…' : 'Simpan Profil'}
+                    </button>
                   </div>
 
                   {/* ── Mobile-only: Dark Mode + Logout ── */}
