@@ -3301,8 +3301,26 @@ const App = () => {
         const deathYear = m.death ? new Date(m.death).getFullYear() : null;
         const spouseNames = m.spouses?.map(s => familyMembers.find(x => x.id === s.id)?.name).filter(Boolean) || [];
         const extractCity = (addr) => { if (!addr) return null; const p = addr.split(',').map(x=>x.trim()).filter(Boolean); return p[p.length-1]||null; };
+        const getGen = (y) => {
+          if (!y || isNaN(y)) return null;
+          if (y >= 2013) return 'Gen Alpha';
+          if (y >= 1997) return 'Gen Z';
+          if (y >= 1981) return 'Milenial';
+          if (y >= 1965) return 'Gen X';
+          if (y >= 1946) return 'Baby Boomer';
+          return 'Silent Gen';
+        };
+        const age = birthYear
+          ? deathYear
+            ? deathYear - birthYear
+            : new Date().getFullYear() - birthYear
+          : null;
+        const gen = getGen(birthYear);
         const rows = [
-          m.birth && { icon: '🎂', label: 'Lahir', value: `${new Date(m.birth).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}${birthYear&&deathYear?' (wafat '+deathYear+')':''}` },
+          m.birth && { icon: '🎂', label: 'Lahir', value: new Date(m.birth).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) },
+          m.death && { icon: '🕊️', label: 'Wafat', value: new Date(m.death).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) },
+          age !== null && { icon: '⏳', label: isDeceased ? 'Usia Wafat' : 'Usia', value: `${age} tahun` },
+          gen && { icon: '🌱', label: 'Generasi', value: gen },
           extractCity(m.address) && { icon: '📍', label: 'Kota', value: extractCity(m.address) },
           m.address && { icon: '🏠', label: 'Alamat', value: m.address },
           m.occupation && { icon: '💼', label: 'Pekerjaan', value: m.occupation },

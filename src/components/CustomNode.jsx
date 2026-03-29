@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Heart, User, MapPin, Briefcase } from 'lucide-react';
+import { Heart, User, MapPin } from 'lucide-react';
 
 const extractCity = (address) => {
   if (!address) return null;
@@ -8,21 +8,10 @@ const extractCity = (address) => {
   return parts[parts.length - 1] || null;
 };
 
-const getGeneration = (birthYear) => {
-  if (!birthYear || isNaN(birthYear)) return null;
-  if (birthYear >= 2013) return { label: 'Gen Alpha', color: '#7c3aed' };
-  if (birthYear >= 1997) return { label: 'Gen Z', color: '#0ea5e9' };
-  if (birthYear >= 1981) return { label: 'Milenial', color: '#059669' };
-  if (birthYear >= 1965) return { label: 'Gen X', color: '#d97706' };
-  if (birthYear >= 1946) return { label: 'Baby Boomer', color: '#dc2626' };
-  return { label: 'Silent Gen', color: '#64748b' };
-};
-
 const FamilyMemberNode = ({ data }) => {
   const isDeceased = !!data.death;
   const isMale = data.gender === 'male';
 
-  const accent     = isDeceased ? '#94a3b8' : isMale ? '#38bdf8' : '#f472b6';
   const accentDeep = isDeceased ? '#64748b' : isMale ? '#0ea5e9' : '#ec4899';
   const gradient   = isDeceased
     ? 'linear-gradient(135deg,#94a3b8 0%,#64748b 100%)'
@@ -35,7 +24,6 @@ const FamilyMemberNode = ({ data }) => {
   const deathYear = data.death && !isNaN(new Date(data.death).getFullYear())
     ? new Date(data.death).getFullYear() : null;
   const city = extractCity(data.address);
-  const gen = getGeneration(parseInt(birthYear));
 
   return (
     <div className="fnc-wrap">
@@ -74,44 +62,18 @@ const FamilyMemberNode = ({ data }) => {
             <div className={`fnc-dot ${isDeceased ? 'dead' : 'live'}`} />
           </div>
 
-          {/* Name on header */}
+          {/* Name */}
           <div className="fnc-header-name">{data.name}</div>
         </div>
 
-        {/* Body */}
+        {/* Body — fixed 2 rows for uniform card height */}
         <div className="fnc-body">
           <div className="fnc-years" style={{ color: accentDeep }}>
             {birthYear}{deathYear ? ` – ${deathYear}` : ''}
           </div>
-
-          {city && (
-            <div className="fnc-row">
-              <MapPin size={9} style={{ color: accentDeep, flexShrink: 0 }} />
-              <span>{city}</span>
-            </div>
-          )}
-
-          {data.occupation && (
-            <div className="fnc-row">
-              <Briefcase size={9} style={{ color: accentDeep, flexShrink: 0 }} />
-              <span>{data.occupation}</span>
-            </div>
-          )}
-
-          <div className="fnc-badges">
-            <span className={`fnc-badge ${isDeceased ? 'badge-dead' : 'badge-live'}`}>
-              {isDeceased ? (isMale ? 'Almarhum' : 'Almarhumah') : 'Hidup'}
-            </span>
-            {data.nasabLabel && (
-              <span className="fnc-badge badge-nasab" style={{ color: accentDeep, background: `${accentDeep}18` }}>
-                {data.nasabLabel}
-              </span>
-            )}
-            {gen && (
-              <span className="fnc-badge" style={{ background: `${gen.color}18`, color: gen.color }}>
-                {gen.label}
-              </span>
-            )}
+          <div className="fnc-row">
+            <MapPin size={9} style={{ color: accentDeep, flexShrink: 0 }} />
+            <span>{city || '—'}</span>
           </div>
         </div>
       </div>

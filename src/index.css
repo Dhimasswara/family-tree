@@ -445,12 +445,13 @@ body {
   white-space: nowrap;
 }
 
-/* Body */
+/* Body — fixed height so all cards are uniform */
 .fnc-body {
   padding: 9px 11px 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  height: 50px;
 }
 .fnc-years {
   font-size: 0.72rem;
