@@ -1191,6 +1191,9 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
   .navbar-logout-inline { display: none !important; }
   .navbar-user-chip span { display: none; }
   .navbar-user-chip { padding: 3px; gap: 2px; max-width: none; border: none; background: transparent; }
+  /* Push actions to far right (views hidden, so nothing else fills the gap) */
+  .navbar-brand { flex: 1; }
+  .navbar-actions { margin-left: 0; }
 
   /* ── Mobile-only settings section (dark mode + logout) ── */
   .mobile-settings-section { display: block !important; }
