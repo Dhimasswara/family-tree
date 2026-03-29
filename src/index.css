@@ -1172,13 +1172,13 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
   #app-main { padding-bottom: 62px; }
 
   /* ── Navbar ── */
-  .app-navbar { padding: 0 12px; gap: 6px; height: 52px; }
+  .app-navbar { padding: 0 12px; gap: 6px; height: 52px; justify-content: space-between; }
   .navbar-views { display: none !important; }
   .navbar-sub { display: none; }
   .navbar-title { font-size: 0.88rem; }
-  .navbar-brand { gap: 8px; }
+  .navbar-brand { gap: 8px; flex-shrink: 1; min-width: 0; }
   .navbar-logo-icon, .navbar-logo-img { width: 30px; height: 30px; }
-  .navbar-actions { gap: 3px; }
+  .navbar-actions { gap: 3px; flex-shrink: 0; }
   .navbar-icon-btn { width: 32px; height: 32px; }
   .navbar-user-chip { max-width: 110px; padding: 3px 6px 3px 3px; gap: 4px; }
   .navbar-user-chip span { max-width: 55px; }
@@ -1191,9 +1191,6 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
   .navbar-logout-inline { display: none !important; }
   .navbar-user-chip span { display: none; }
   .navbar-user-chip { padding: 3px; gap: 2px; max-width: none; border: none; background: transparent; }
-  /* Push actions to far right (views hidden, so nothing else fills the gap) */
-  .navbar-brand { flex: 1; }
-  .navbar-actions { margin-left: 0; }
 
   /* ── Mobile-only settings section (dark mode + logout) ── */
   .mobile-settings-section { display: block !important; }
