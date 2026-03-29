@@ -2271,7 +2271,7 @@ const App = () => {
             if (authReady && !planConfig.features.kinship) { openProModal('Fitur Galeri Cerita tersedia di paket Starter ke atas.'); return; }
             setView('gallery');
           }} style={view === 'gallery' ? { background: 'var(--primary)', color: 'white' } : {}}>
-            📸 Galeri {authReady && !planConfig.features.kinship && '🔒'}
+            <Camera size={14} /> Galeri {authReady && !planConfig.features.kinship && '🔒'}
           </button>
           <button className={`nav-pill ${view === 'table' ? 'active' : ''}`} onClick={() => setView('table')}>
             <TableIcon size={14} /> Tabel

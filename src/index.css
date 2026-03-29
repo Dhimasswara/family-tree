@@ -1260,3 +1260,42 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
   .navbar-login-btn span { display: none; }
   .navbar-login-btn { padding: 0 !important; width: 32px; height: 32px; border-radius: 9px; justify-content: center; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   iPad mini (641–768px) — same navbar treatment as mobile
+══════════════════════════════════════════════════════════════ */
+@media (min-width: 641px) and (max-width: 768px) {
+  .bottom-nav { display: block; }
+  #app-main { padding-bottom: 62px; }
+  .app-navbar { padding: 0 16px; height: 52px; }
+  .navbar-views { display: none !important; }
+  .navbar-sub { display: none; }
+  .navbar-brand { gap: 8px; max-width: calc(100% - 90px); overflow: hidden; }
+  .navbar-actions {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .navbar-settings-btn  { display: none !important; }
+  .navbar-theme-btn     { display: none !important; }
+  .navbar-logout-inline { display: none !important; }
+  .kinship-btn          { display: none !important; }
+  .navbar-user-chip span { display: none; }
+  .navbar-user-chip { padding: 3px; gap: 2px; max-width: none; border: none; background: transparent; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   iPad Air (769–1024px) — icon-only nav pills
+══════════════════════════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .nav-pill { font-size: 0 !important; padding: 6px 10px; gap: 0; }
+  .nav-pill svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .navbar-user-chip span { display: none; }
+  .navbar-user-chip { max-width: none; }
+  .navbar-logout-inline { display: none !important; }
+  .navbar-sub { font-size: 0.6rem; max-width: 120px; }
+}
