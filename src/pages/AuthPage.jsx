@@ -97,7 +97,7 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
       // Get family by code
       const { data: fam, error: famErr } = await supabase
         .from('families')
-        .select('id, name, plan')
+        .select('id, name, plan, config')
         .eq('code', familyCode.trim().toUpperCase())
         .single();
       if (famErr || !fam) throw new Error('Kode keluarga tidak ditemukan.');

@@ -575,6 +575,9 @@ const App = () => {
         setFamilyUser(member);
         setCurrentFamily(family);
         setUserPlan(family?.plan || 'free');
+        if (family?.config && Object.keys(family.config).length > 0) {
+          setAppConfig(prev => ({ ...prev, ...family.config }));
+        }
         setAppPage('app');
       } catch (_) { sessionStorage.removeItem('famSession'); }
     }
@@ -770,16 +773,16 @@ const App = () => {
 
   useEffect(() => {
     if (!supabase || !currentFamily?.id) return;
-    const ch = supabase.channel(`gp:${currentFamily.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${currentFamily.id}` },
-        ({ new: row }) => setGalleryPosts(prev => {
-          // avoid duplicate if this is our own post echoed back
-          if (prev.some(p => p.id === row.id)) return prev;
-          return [row, ...prev];
-        }))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${currentFamily.id}` },
+    const fid = currentFamily.id;
+    const ch = supabase.channel(`gp:${fid}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${fid}` },
+        ({ new: row }) => setGalleryPosts(prev =>
+          prev.some(p => p.id === row.id) ? prev : [row, ...prev]))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${fid}` },
         ({ new: row }) => setGalleryPosts(prev => prev.map(p => p.id === row.id ? row : p)))
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'gallery_posts', filter: `family_id=eq.${currentFamily.id}` },
+      // DELETE: no filter — old record only has PK (id) without REPLICA IDENTITY FULL
+      // We guard against cross-family deletes by only removing ids we actually have
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'gallery_posts' },
         ({ old: row }) => setGalleryPosts(prev => prev.filter(p => p.id !== row.id)))
       .subscribe();
     return () => supabase.removeChannel(ch);
@@ -2097,7 +2100,10 @@ const App = () => {
           setFamilyUser(member);
           setCurrentFamily(family);
           setUserPlan(family?.plan || 'free');
-          // Persist family member session across page reload
+          // Apply admin's saved app config (name, logo, tagline)
+          if (family?.config && Object.keys(family.config).length > 0) {
+            setAppConfig(prev => ({ ...prev, ...family.config }));
+          }
           sessionStorage.setItem('famSession', JSON.stringify({ member, family }));
           setAppPage('app');
         }}

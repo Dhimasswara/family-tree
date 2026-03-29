@@ -282,8 +282,9 @@ const GalleryView = ({ familyId, posts = [], loading = false, currentUser, canEd
   const [rawSrc, setRawSrc]     = useState(null);
   const [photo, setPhoto]       = useState(null);
   const [lightbox, setLightbox] = useState(null);
-  const [saving, setSaving]     = useState(false);
-  const [errMsg, setErrMsg]     = useState(null);
+  const [saving, setSaving]         = useState(false);
+  const [errMsg, setErrMsg]         = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // post id to delete
   const fileRef = useRef();
 
   const userId = currentUser?.id || 'anon';
@@ -472,7 +473,7 @@ const GalleryView = ({ familyId, posts = [], loading = false, currentUser, canEd
                     </div>
                   </div>
                   {canDelete && (
-                    <button onClick={() => handleDelete(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 3 }}><Trash2 size={13}/></button>
+                    <button onClick={() => setConfirmDelete(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 3 }}><Trash2 size={13}/></button>
                   )}
                 </div>
 
@@ -507,6 +508,28 @@ const GalleryView = ({ familyId, posts = [], loading = false, currentUser, canEd
           })}
         </div>
       )}
+
+      {/* Confirm delete modal */}
+      <AnimatePresence>
+        {confirmDelete && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 99998, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass" style={{ borderRadius: 16, padding: '24px 22px', maxWidth: 320, width: '100%', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', marginBottom: 10 }}>🗑️</div>
+              <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: 6 }}>Hapus postingan?</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 20 }}>Postingan ini akan dihapus permanen dan tidak bisa dikembalikan.</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setConfirmDelete(null)} className="btn glass" style={{ flex: 1, padding: '10px', fontSize: '0.85rem' }}>Batal</button>
+                <button onClick={() => { handleDelete(confirmDelete); setConfirmDelete(null); }}
+                  style={{ flex: 1, padding: '10px', background: '#ef4444', border: 'none', borderRadius: 10, color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'Outfit,sans-serif' }}>
+                  Hapus
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Lightbox */}
       <AnimatePresence>
