@@ -2331,7 +2331,7 @@ const App = () => {
             )}
           </div>
 
-          <button className="navbar-icon-btn" onClick={toggleTheme} title="Tema">
+          <button className="navbar-icon-btn navbar-theme-btn" onClick={toggleTheme} title="Tema">
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
           <button className="navbar-icon-btn kinship-btn" style={{ color: 'var(--primary)' }} onClick={() => {
@@ -2345,7 +2345,7 @@ const App = () => {
             <div className="navbar-user-chip">
               <div className="navbar-user-avatar"><User size={12} /></div>
               <span>{familyUser.name}</span>
-              <button className="navbar-icon-btn" onClick={() => { setFamilyUser(null); setCurrentFamily(null); sessionStorage.removeItem('famSession'); setAppPage('auth'); }} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
+              <button className="navbar-icon-btn navbar-logout-inline" onClick={() => { setFamilyUser(null); setCurrentFamily(null); sessionStorage.removeItem('famSession'); setAppPage('auth'); }} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
             </div>
           ) : !user && (
             <button className="navbar-icon-btn" style={{ color: 'var(--primary)' }} onClick={() => setShowFamilyLoginModal(true)} title="Masuk Keluarga">
@@ -2359,7 +2359,7 @@ const App = () => {
                 <ShieldCheck size={12} />
               </div>
               <span>{user.email?.split('@')[0]}</span>
-              <button className="navbar-icon-btn" onClick={handleLogout} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
+              <button className="navbar-icon-btn navbar-logout-inline" onClick={handleLogout} title="Keluar"><LogOut size={13} style={{ color: 'var(--danger)' }} /></button>
             </div>
           ) : !familyUser && (
             <button className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '0.8rem' }} onClick={() => setAppPage('auth')}>
@@ -2603,53 +2603,47 @@ const App = () => {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {familyMembers.sort((a,b) => a.name.localeCompare(b.name)).map(m => (
-                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'var(--bg-main)', borderRadius: '10px', border: '1px solid var(--border-card)' }}>
+                        <div key={m.id} className="pin-member-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'var(--bg-main)', borderRadius: '10px', border: '1px solid var(--border-card)' }}>
                           <div style={{ width: 32, height: 32, borderRadius: '50%', background: m.gender === 'male' ? 'rgba(2,132,199,0.15)' : 'rgba(190,24,93,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: m.gender === 'male' ? '#0284c7' : '#be185d', flexShrink: 0 }}>
                             <User size={15} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{m.pin ? '● PIN sudah di-set' : '○ Belum ada PIN'}</div>
+                            <div style={{ fontSize: '0.68rem', color: m.pin ? '#22c55e' : 'var(--text-muted)' }}>{m.pin ? '● PIN aktif' : '○ Belum ada PIN'}</div>
                           </div>
-                          <input
-                            type="password"
-                            placeholder="Set PIN baru..."
-                            value={pinBuffers[m.id] || ''}
-                            onChange={e => setPinBuffers(prev => ({ ...prev, [m.id]: e.target.value }))}
-                            className="fi"
-                            style={{ width: '140px', padding: '8px 12px', fontSize: '0.82rem' }}
-                            maxLength={20}
-                          />
-                          <button
-                            className="btn btn-primary"
-                            style={{ padding: '8px 14px', fontSize: '0.8rem', flexShrink: 0 }}
-                            onClick={async () => {
-                              if (!pinBuffers[m.id]) return;
-                              setFamilyMembers(prev => prev.map(fm => fm.id === m.id ? { ...fm, pin: pinBuffers[m.id] } : fm));
-                              setPinBuffers(prev => ({ ...prev, [m.id]: '' }));
-                              if (supabase) {
-                                await supabase.from('family_members').update({ pin: pinBuffers[m.id] }).eq('id', m.id);
-                              }
-                            }}
-                            disabled={!pinBuffers[m.id]}
-                          >
-                            <Key size={13} /> Simpan
-                          </button>
-                          {m.pin && (
+                          <div className="pin-controls" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <input
+                              type="password"
+                              placeholder="PIN baru..."
+                              value={pinBuffers[m.id] || ''}
+                              onChange={e => setPinBuffers(prev => ({ ...prev, [m.id]: e.target.value }))}
+                              className="fi"
+                              style={{ width: '130px', padding: '8px 12px', fontSize: '0.82rem' }}
+                              maxLength={20}
+                            />
                             <button
-                              className="btn glass"
-                              style={{ padding: '8px', color: 'var(--danger)', flexShrink: 0 }}
-                              title="Hapus PIN"
+                              className="btn btn-primary"
+                              style={{ padding: '8px 12px', fontSize: '0.8rem', flexShrink: 0 }}
                               onClick={async () => {
-                                setFamilyMembers(prev => prev.map(fm => fm.id === m.id ? { ...fm, pin: '' } : fm));
-                                if (supabase) {
-                                  await supabase.from('family_members').update({ pin: '' }).eq('id', m.id);
-                                }
+                                if (!pinBuffers[m.id]) return;
+                                setFamilyMembers(prev => prev.map(fm => fm.id === m.id ? { ...fm, pin: pinBuffers[m.id] } : fm));
+                                setPinBuffers(prev => ({ ...prev, [m.id]: '' }));
+                                if (supabase) await supabase.from('family_members').update({ pin: pinBuffers[m.id] }).eq('id', m.id);
                               }}
+                              disabled={!pinBuffers[m.id]}
                             >
-                              <X size={14} />
+                              <Key size={13} />
                             </button>
-                          )}
+                            {m.pin && (
+                              <button className="btn glass" style={{ padding: '8px', color: 'var(--danger)', flexShrink: 0 }} title="Hapus PIN"
+                                onClick={async () => {
+                                  setFamilyMembers(prev => prev.map(fm => fm.id === m.id ? { ...fm, pin: '' } : fm));
+                                  if (supabase) await supabase.from('family_members').update({ pin: '' }).eq('id', m.id);
+                                }}>
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2798,6 +2792,23 @@ const App = () => {
 
                   <div style={{ textAlign: 'right', marginTop: '10px' }}>
                      <p style={{ fontSize: '0.75rem', opacity: 0.5 }}>Perubahan pengaturan otomatis disimpan seketika ke Database Lokal.</p>
+                  </div>
+
+                  {/* ── Mobile-only: Dark Mode + Logout ── */}
+                  <div className="mobile-settings-section">
+                    <hr style={{ borderColor: 'var(--border-card)', margin: '8px 0 16px' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-main)', borderRadius: 12, border: '1px solid var(--border-card)', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+                        <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Mode Gelap</span>
+                      </div>
+                      <button className="btn glass" style={{ padding: '6px 14px', fontSize: '0.8rem' }} onClick={toggleTheme}>
+                        {theme === 'light' ? 'Aktifkan' : 'Nonaktifkan'}
+                      </button>
+                    </div>
+                    <button className="btn" style={{ width: '100%', padding: '12px', background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} onClick={handleLogout}>
+                      <LogOut size={16} /> Keluar dari Akun
+                    </button>
                   </div>
                </div>
             </motion.div>
@@ -3152,12 +3163,17 @@ const App = () => {
             <MapPin size={20} />
             Peta
           </button>
-          {(userRole === 'super_admin' || userRole === 'admin') && (
+          {(userRole === 'super_admin' || userRole === 'admin') ? (
             <button className={`bottom-nav-tab ${view === 'settings' ? 'active' : ''}`} onClick={() => setView(view === 'settings' ? 'tree' : 'settings')}>
               <Settings size={20} />
               Atur
             </button>
-          )}
+          ) : familyUser ? (
+            <button className="bottom-nav-tab" style={{ color: 'var(--danger)' }} onClick={() => { setFamilyUser(null); setCurrentFamily(null); sessionStorage.removeItem('famSession'); setAppPage('auth'); }}>
+              <LogOut size={20} />
+              Keluar
+            </button>
+          ) : null}
         </div>
       </nav>
 
