@@ -1101,9 +1101,11 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
 .leaflet-popup-content-wrapper { border-radius: 14px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important; }
 .leaflet-popup-content { margin: 12px 14px !important; }
 
-/* Member list: table on desktop, cards on mobile */
+/* Member / bday / anniv: table on desktop, cards on mobile */
 .member-table-desktop { display: block; }
 .member-cards-mobile   { display: none; }
+.bday-table-desktop    { display: block; }
+.bday-cards-mobile     { display: none; }
 
 /* ══════════════════════════════════════════════════════════════
    BOTTOM NAV  (mobile tab bar, hidden on desktop)
@@ -1180,17 +1182,16 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
   .navbar-user-avatar { width: 22px; height: 22px; }
   .kinship-btn { display: none !important; }
 
-  /* ── Stats ribbon → 2×2 grid ── */
-  .stats-ribbon {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 10px 12px;
-    overflow: visible;
-  }
-  .stat-chip { padding: 8px 10px; }
-  .stat-value { font-size: 1rem; }
-  .stat-label { font-size: 0.65rem; }
+  /* ── Navbar: hide redundant items ── */
+  .navbar-settings-btn { display: none !important; }
+  .navbar-user-chip span { display: none; }
+  .navbar-user-chip { padding: 3px; gap: 2px; max-width: none; }
+
+  /* ── Stats ribbon: compact single row, no labels ── */
+  .stats-ribbon { display: flex !important; gap: 6px; padding: 6px 10px; overflow-x: auto; }
+  .stat-chip { padding: 5px 10px; gap: 5px; }
+  .stat-label { display: none; }
+  .stat-value { font-size: 0.95rem; }
 
   /* ── Table action row ── */
   .table-action-row { gap: 10px !important; }
@@ -1200,11 +1201,15 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
   .table-tabs-container .btn { flex: 1; font-size: 0.72rem; padding: 7px 4px !important; }
   .table-glass { padding: 12px !important; }
 
-  /* ── Member table hidden, cards shown ── */
+  /* ── Member table/cards ── */
   .member-table-desktop { display: none !important; }
   .member-cards-mobile   { display: block !important; }
 
-  /* ── Table (birthdays/anniversaries) scroll ── */
+  /* ── Birthday/Anniversary table/cards ── */
+  .bday-table-desktop { display: none !important; }
+  .bday-cards-mobile  { display: block !important; }
+
+  /* ── Table wrapper (birthdays/aniv) ── */
   .table-wrapper { min-width: 480px; }
 
   /* ── Glass ── */
@@ -1212,7 +1217,14 @@ select.fi[disabled] { pointer-events: none; opacity: 0.6; }
 
   /* ── Settings page ── */
   .settings-wrap { padding: 12px !important; }
-  .settings-wrap > .glass { padding: 18px !important; gap: 16px !important; }
+  .settings-glass { padding: 16px !important; gap: 14px !important; }
+  .settings-code-row { flex-direction: column !important; }
+  .settings-code-btns { flex-direction: row !important; flex-wrap: wrap; }
+  .settings-code-btns .btn { flex: 1; font-size: 0.78rem !important; padding: 8px 10px !important; }
+  .settings-code-display { font-size: 1.4rem !important; letter-spacing: 0.2em !important; }
+  .settings-inner-glass { padding: 16px !important; }
+  .settings-pin-row { flex-direction: column !important; gap: 6px !important; }
+  .settings-pin-row input { width: 100% !important; }
 
   /* ── Form grid: always single column on mobile ── */
   .form-grid { grid-template-columns: 1fr !important; }

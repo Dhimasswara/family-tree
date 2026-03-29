@@ -2368,7 +2368,7 @@ const App = () => {
           )}
 
           {(userRole === 'super_admin' || userRole === 'admin') && (
-            <button className={`navbar-icon-btn ${view === 'settings' ? 'active' : ''}`} onClick={() => setView(view === 'settings' ? 'tree' : 'settings')} title="Pengaturan">
+            <button className={`navbar-icon-btn navbar-settings-btn ${view === 'settings' ? 'active' : ''}`} onClick={() => setView(view === 'settings' ? 'tree' : 'settings')} title="Pengaturan">
               <Settings size={16} />
             </button>
           )}
@@ -2483,7 +2483,7 @@ const App = () => {
             />
           ) : ((userRole === 'super_admin' || userRole === 'admin') && view === 'settings') ? (
             <motion.div key="settings" className="settings-wrap" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-               <div className="glass" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+               <div className="glass settings-glass" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h2 style={{ marginBottom: '10px' }}>Pengaturan Aplikasi</h2>
                     <span style={{ fontSize: '0.75rem', background: 'rgba(56, 189, 248, 0.2)', color: '#0ea5e9', padding: '4px 10px', borderRadius: '20px', fontWeight: 600 }}>
@@ -2526,7 +2526,7 @@ const App = () => {
 
                   {/* Kode Keluarga */}
                   {currentFamily && (
-                    <div className="glass" style={{ padding: '24px', marginBottom: '20px', border: '1px solid rgba(217,119,6,0.15)' }}>
+                    <div className="glass settings-inner-glass" style={{ padding: '24px', marginBottom: '20px', border: '1px solid rgba(217,119,6,0.15)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                         <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Key size={18} />
@@ -2536,13 +2536,13 @@ const App = () => {
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bagikan ke anggota untuk login. Jaga kerahasiaannya.</div>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div className="settings-code-row" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ flex: 1, background: 'var(--bg-main)', border: '2px dashed var(--primary)', borderRadius: '12px', padding: '14px 20px', textAlign: 'center' }}>
-                          <span style={{ fontFamily: 'monospace', fontSize: '2rem', fontWeight: 800, letterSpacing: '0.3em', color: 'var(--primary)' }}>
+                          <span className="settings-code-display" style={{ fontFamily: 'monospace', fontSize: '2rem', fontWeight: 800, letterSpacing: '0.3em', color: 'var(--primary)' }}>
                             {currentFamily.code}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className="settings-code-btns" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <button className="btn btn-primary" style={{ padding: '10px 14px', fontSize: '0.82rem', gap: 6 }}
                             onClick={() => {
                               navigator.clipboard.writeText(currentFamily.code);
@@ -2572,7 +2572,7 @@ const App = () => {
                   )}
 
                   {/* PIN Management */}
-                  <div className="glass" style={{ padding: '24px', marginBottom: '20px' }}>
+                  <div className="glass settings-inner-glass" style={{ padding: '24px', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                       <div style={{ background: 'var(--primary-light)', color: 'var(--primary)', width: 38, height: 38, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Key size={18} />
@@ -3025,73 +3025,100 @@ const App = () => {
                 })()}
 
                 {tableTab === 'birthdays' && (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)' }}>
-                        <th style={{ padding: '12px', textAlign: 'left' }}>Anggota</th>
-                        <th style={{ padding: '12px', textAlign: 'left' }}>Tgl Lahir</th>
-                        <th style={{ padding: '12px', textAlign: 'left' }}>Ulang Tahun Ke-</th>
-                        <th style={{ padding: '12px', textAlign: 'right' }}>Hitung Mundur</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getUpcomingBirthdays().map(row => (
-                        <tr key={row.member.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
-                          <td style={{ padding: '12px', fontWeight: 600 }}>{row.member.name}</td>
-                          <td style={{ padding: '12px' }}>{new Date(row.member.birth).toLocaleDateString('id-ID', {day: 'numeric', month: 'long'})}</td>
-                          <td style={{ padding: '12px' }}>{row.info.years} Tahun</td>
-                          <td style={{ padding: '12px', textAlign: 'right', color: row.info.daysLeft === 0 ? '#10b981' : 'inherit', fontWeight: row.info.daysLeft === 0 ? 700 : 400 }}>
-                            {row.info.daysLeft === 0 ? 'HARI INI! 🎉' : `${row.info.daysLeft} hari lagi`}
-                          </td>
-                        </tr>
-                      ))}
-                      {getUpcomingBirthdays().length === 0 && (
-                        <tr><td colSpan="4" style={{ padding: '20px', textAlign: 'center', opacity: 0.6 }}>Tidak ada data ulang tahun</td></tr>
-                      )}
-                    </tbody>
-                  </table>
+                  <>
+                    {/* Desktop */}
+                    <div className="bday-table-desktop">
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)' }}>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Anggota</th>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Tgl Lahir</th>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Ke-</th>
+                            <th style={{ padding: '12px', textAlign: 'right' }}>Hitung Mundur</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getUpcomingBirthdays().map(row => (
+                            <tr key={row.member.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
+                              <td style={{ padding: '12px', fontWeight: 600 }}>{row.member.name}</td>
+                              <td style={{ padding: '12px' }}>{new Date(row.member.birth).toLocaleDateString('id-ID', {day: 'numeric', month: 'long'})}</td>
+                              <td style={{ padding: '12px' }}>{row.info.years} Tahun</td>
+                              <td style={{ padding: '12px', textAlign: 'right', color: row.info.daysLeft === 0 ? '#10b981' : 'inherit', fontWeight: row.info.daysLeft === 0 ? 700 : 400 }}>{row.info.daysLeft === 0 ? 'HARI INI! 🎉' : `${row.info.daysLeft} hari lagi`}</td>
+                            </tr>
+                          ))}
+                          {getUpcomingBirthdays().length === 0 && <tr><td colSpan="4" style={{ padding: '20px', textAlign: 'center', opacity: 0.6 }}>Tidak ada data ulang tahun</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Mobile cards */}
+                    <div className="bday-cards-mobile">
+                      {getUpcomingBirthdays().length === 0
+                        ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Tidak ada data ulang tahun</div>
+                        : getUpcomingBirthdays().map(row => (
+                          <div key={row.member.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border-card)' }}>
+                            <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>🎂</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.member.name}</div>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>
+                                {new Date(row.member.birth).toLocaleDateString('id-ID', {day:'numeric',month:'short'})} · {row.info.years} thn
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 8px', borderRadius: 6, flexShrink: 0, color: row.info.daysLeft === 0 ? '#10b981' : 'var(--primary)', background: row.info.daysLeft === 0 ? 'rgba(16,185,129,0.1)' : 'var(--primary-light)' }}>
+                              {row.info.daysLeft === 0 ? 'Hari ini! 🎉' : `${row.info.daysLeft}h lagi`}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </>
                 )}
 
                 {tableTab === 'anniversaries' && (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)' }}>
-                        <th style={{ padding: '12px', textAlign: 'left' }}>Pasangan</th>
-                        <th style={{ padding: '12px', textAlign: 'left' }}>Tgl Menikah</th>
-                        <th style={{ padding: '12px', textAlign: 'left' }}>Anniversary Ke-</th>
-                        <th style={{ padding: '12px', textAlign: 'right' }}>Hitung Mundur</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getUpcomingAnniversaries().map((row, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--border-card)' }}>
-                          <td style={{ padding: '12px', fontWeight: 600 }}>{row.p1.name} & {row.p2.name}</td>
-                          <td style={{ padding: '12px' }}>
-                            {/* Cari tanggal nikah dari sisi manapun yang menyediakan data (fallback) */}
-                            {(() => {
-                              const date = row.p1.spouses?.find(s => s.id === row.p2.id)?.marriageDate || 
-                                           row.p2.spouses?.find(s => s.id === row.p1.id)?.marriageDate;
-                              return date ? new Date(date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long'}) : '-';
-                            })()}
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            <div style={{ fontWeight: 600 }}>{row.info.years} Tahun</div>
-                            {getAnniversaryRank(row.info.years) && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
-                                Pernikahan {getAnniversaryRank(row.info.years)}
+                  <>
+                    <div className="bday-table-desktop">
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)' }}>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Pasangan</th>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Tgl Menikah</th>
+                            <th style={{ padding: '12px', textAlign: 'left' }}>Anniversary Ke-</th>
+                            <th style={{ padding: '12px', textAlign: 'right' }}>Hitung Mundur</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getUpcomingAnniversaries().map((row, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid var(--border-card)' }}>
+                              <td style={{ padding: '12px', fontWeight: 600 }}>{row.p1.name} & {row.p2.name}</td>
+                              <td style={{ padding: '12px' }}>{(() => { const d = row.p1.spouses?.find(s=>s.id===row.p2.id)?.marriageDate||row.p2.spouses?.find(s=>s.id===row.p1.id)?.marriageDate; return d?new Date(d).toLocaleDateString('id-ID',{day:'numeric',month:'long'}):'-'; })()}</td>
+                              <td style={{ padding: '12px' }}>
+                                <div style={{ fontWeight: 600 }}>{row.info.years} Tahun</div>
+                                {getAnniversaryRank(row.info.years) && <div style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Pernikahan {getAnniversaryRank(row.info.years)}</div>}
+                              </td>
+                              <td style={{ padding: '12px', textAlign: 'right', color: row.info.daysLeft===0?'#10b981':'inherit', fontWeight: row.info.daysLeft===0?700:400 }}>{row.info.daysLeft===0?'HARI INI! 💍':`${row.info.daysLeft} hari lagi`}</td>
+                            </tr>
+                          ))}
+                          {getUpcomingAnniversaries().length===0 && <tr><td colSpan="4" style={{padding:'20px',textAlign:'center',opacity:0.6}}>Tidak ada data anniversary pernikahan</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="bday-cards-mobile">
+                      {getUpcomingAnniversaries().length === 0
+                        ? <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Tidak ada data anniversary</div>
+                        : getUpcomingAnniversaries().map((row, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border-card)' }}>
+                            <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>💍</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.p1.name} & {row.p2.name}</div>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>
+                                {row.info.years} thn{getAnniversaryRank(row.info.years) ? ` · ${getAnniversaryRank(row.info.years)}` : ''}
                               </div>
-                            )}
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right', color: row.info.daysLeft === 0 ? '#10b981' : 'inherit', fontWeight: row.info.daysLeft === 0 ? 700 : 400 }}>
-                            {row.info.daysLeft === 0 ? 'HARI INI! 💍' : `${row.info.daysLeft} hari lagi`}
-                          </td>
-                        </tr>
-                      ))}
-                      {getUpcomingAnniversaries().length === 0 && (
-                        <tr><td colSpan="4" style={{ padding: '20px', textAlign: 'center', opacity: 0.6 }}>Tidak ada data anniversary pernikahan (Isi tanggal menikah terlebih dahulu)</td></tr>
-                      )}
-                    </tbody>
-                  </table>
+                            </div>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 8px', borderRadius: 6, flexShrink: 0, color: row.info.daysLeft===0?'#10b981':'var(--primary)', background: row.info.daysLeft===0?'rgba(16,185,129,0.1)':'var(--primary-light)' }}>
+                              {row.info.daysLeft===0?'Hari ini! 💍':`${row.info.daysLeft}h lagi`}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </>
                 )}
               </div>
             </motion.div>
