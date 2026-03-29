@@ -599,7 +599,11 @@ const App = () => {
         restoreSession(u);
       } else {
         setUserRole(null);
-        setCurrentFamily(null);
+        // Only clear family data if no family-member session is active.
+        // Family members have no Supabase auth session — don't wipe their state.
+        if (!sessionStorage.getItem('famSession')) {
+          setCurrentFamily(null);
+        }
       }
     });
 
