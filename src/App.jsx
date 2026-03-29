@@ -21,7 +21,7 @@ import {
   Trash2, Edit2, Save, X, Camera, Heart, Baby, Sun, Moon, Search,
   Divide, Settings, Download, Upload, LogIn, LogOut, Lock, Unlock, ShieldCheck, UserCog,
   MapPin, Briefcase, GraduationCap, Phone, FileText,
-  Key, Crown, Star, Shield, ChevronDown, Copy, RefreshCw
+  Key, Crown, Star, Shield, ChevronDown, Copy, RefreshCw, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
@@ -378,6 +378,9 @@ const App = () => {
   // Gallery state lives here so it persists when switching between views
   const [galleryPosts, setGalleryPosts]     = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
+  const [notifications, setNotifications]   = useState([]);
+  const [notifOpen, setNotifOpen]           = useState(false);
+  const prevGalleryPostsRef                 = useRef(null);
   // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
   const [toast, setToast] = useState(null);
   const [proModal, setProModal] = useState(null);   // { message }
@@ -760,6 +763,44 @@ const App = () => {
     }, 1000);
   };
 
+  // ── Gallery notifications: detect new posts, likes, comments ──
+  useEffect(() => {
+    if (galleryLoading) return;
+    const myId = user?.id || familyUser?.id;
+    if (!myId) return;
+    const prev = prevGalleryPostsRef.current;
+    if (prev === null) { prevGalleryPostsRef.current = galleryPosts; return; }
+
+    const newNotifs = [];
+    galleryPosts.forEach(post => {
+      const old = prev.find(p => p.id === post.id);
+      if (!old) {
+        // New post by someone else
+        if (post.author_id !== myId) {
+          newNotifs.push({ id: `n${Date.now()}${Math.random()}`, type: 'post', text: `${post.author_name} menambahkan postingan baru`, time: new Date().toISOString(), read: false });
+        }
+      } else if (post.author_id === myId) {
+        // New like on my post
+        const oldLikes = old.liked_by || [];
+        const newLikes = post.liked_by || [];
+        const added = newLikes.filter(id => !oldLikes.includes(id) && id !== myId);
+        if (added.length > 0) {
+          newNotifs.push({ id: `n${Date.now()}${Math.random()}`, type: 'like', text: `Seseorang menyukai postinganmu`, time: new Date().toISOString(), read: false });
+        }
+        // New comment on my post
+        const oldComments = old.comments || [];
+        const newComments = post.comments || [];
+        const addedComments = newComments.filter(c => !oldComments.find(oc => oc.id === c.id) && c.authorId !== myId);
+        addedComments.forEach(c => {
+          newNotifs.push({ id: `n${Date.now()}${Math.random()}`, type: 'comment', text: `${c.authorName} mengomentari postinganmu`, time: new Date().toISOString(), read: false });
+        });
+      }
+    });
+
+    if (newNotifs.length > 0) setNotifications(prev => [...newNotifs, ...prev].slice(0, 30));
+    prevGalleryPostsRef.current = galleryPosts;
+  }, [galleryPosts]);
+
   // ── Families realtime: plan + config instantly pushed to all open sessions ──
   useEffect(() => {
     if (!supabase || !currentFamily?.id) return;
@@ -793,6 +834,7 @@ const App = () => {
   const loadGallery = useCallback(async (fid) => {
     if (!supabase || !fid) return;
     setGalleryLoading(true);
+    prevGalleryPostsRef.current = null; // reset so initial load doesn't trigger notifs
     const { data } = await supabase.from('gallery_posts').select('*').eq('family_id', fid).order('created_at', { ascending: false });
     if (data) setGalleryPosts(data);
     setGalleryLoading(false);
@@ -2200,6 +2242,45 @@ const App = () => {
 
         {/* Right: Actions */}
         <div className="navbar-actions">
+          {/* Notification Bell */}
+          <div style={{ position: 'relative' }}>
+            <button className="navbar-icon-btn" onClick={() => { setNotifOpen(o => !o); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }} title="Notifikasi">
+              <Bell size={16} />
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', border: '1.5px solid var(--bg-header)' }} />
+              )}
+            </button>
+            {notifOpen && (
+              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 300, background: 'var(--bg-card)', border: '1px solid var(--border-card)', borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 9999, overflow: 'hidden' }}
+                onMouseLeave={() => setNotifOpen(false)}>
+                <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: '0.85rem', borderBottom: '1px solid var(--border-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Notifikasi</span>
+                  {notifications.length > 0 && <button onClick={() => setNotifications([])} style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Hapus semua</button>}
+                </div>
+                <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      <Bell size={24} style={{ opacity: 0.3, display: 'block', margin: '0 auto 8px' }} />
+                      Belum ada notifikasi
+                    </div>
+                  ) : notifications.map(n => (
+                    <div key={n.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-card)', display: 'flex', gap: 10, alignItems: 'flex-start', background: n.read ? 'transparent' : 'rgba(14,165,233,0.06)' }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 8, background: n.type === 'post' ? 'rgba(99,102,241,0.15)' : n.type === 'like' ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.9rem' }}>
+                        {n.type === 'post' ? '📸' : n.type === 'like' ? '❤️' : '💬'}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.4 }}>{n.text}</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                          {new Date(n.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button className="navbar-icon-btn" onClick={toggleTheme} title="Tema">
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
