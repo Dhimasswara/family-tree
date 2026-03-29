@@ -2850,7 +2850,7 @@ const App = () => {
                 </div>
               </div>
 
-              <div className="glass" style={{ padding: '24px', overflowX: 'auto', marginBottom: '40px' }}>
+              <div className="glass table-glass" style={{ padding: '24px', overflowX: 'auto', marginBottom: '40px' }}>
                 {tableTab === 'members' && (() => {
                   const filteredMembers = familyMembers
                     .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -2858,6 +2858,38 @@ const App = () => {
                   const allSelected = filteredMembers.length > 0 && selectedIds.size === filteredMembers.length;
                   const someSelected = selectedIds.size > 0 && !allSelected;
                   return (
+                  <>
+                  {/* ── Mobile card list ── */}
+                  <div className="member-cards-mobile">
+                    {filteredMembers.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Tidak ada anggota ditemukan</div>
+                    ) : filteredMembers.map(m => (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border-card)' }}>
+                        {m.photo ? (
+                          <img src={m.photo} alt="" style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 42, height: 42, borderRadius: '50%', background: m.gender === 'male' ? '#0ea5e9' : '#db2777', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <User size={18} />
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
+                          <div style={{ fontSize: '0.7rem', color: m.gender === 'male' ? 'var(--male-border)' : 'var(--female-border)', marginTop: 1 }}>
+                            {m.gender === 'male' ? '♂ Laki-laki' : '♀ Perempuan'}{m.birth ? ` · ${new Date(m.birth).getFullYear()}` : ''}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '0.68rem', padding: '3px 7px', borderRadius: 4, background: m.death ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: m.death ? '#ef4444' : '#22c55e', flexShrink: 0 }}>
+                          {m.death ? 'Wafat' : 'Hidup'}
+                        </span>
+                        <button className="btn glass" style={{ padding: 6, flexShrink: 0 }} onClick={() => handleEdit(m)} title={user ? 'Edit' : 'Detail'}>
+                          {user ? <Edit2 size={14} /> : <User size={14} />}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ── Desktop table ── */}
+                  <div className="member-table-desktop">
                   <div className="table-wrapper">
                   {user && selectedIds.size > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', padding: '10px 14px', background: 'rgba(239,68,68,0.08)', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -2987,6 +3019,8 @@ const App = () => {
                   </tbody>
                 </table>
               </div>
+              </div>
+              </>
                   );
                 })()}
 
