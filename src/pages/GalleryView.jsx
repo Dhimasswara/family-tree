@@ -190,7 +190,7 @@ const CropModal = ({ src, onConfirm, onCancel }) => {
 };
 
 // ── Comment Thread ──
-const CommentThread = ({ comments = [], currentUser, canAdmin, onUpdate }) => {
+const CommentThread = ({ comments = [], currentUser, canAdmin, onUpdate, onMemberClick }) => {
   const [text, setText]           = useState('');
   const [replyTo, setReplyTo]     = useState(null);
   const [replyText, setReplyText] = useState('');
@@ -221,10 +221,20 @@ const CommentThread = ({ comments = [], currentUser, canAdmin, onUpdate }) => {
         {expanded && comments.map(c => (
           <motion.div key={c.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start' }}>
-              <Avatar name={c.authorName} size={26} />
+              <div 
+                style={{ cursor: onMemberClick ? 'pointer' : 'default' }} 
+                onClick={() => onMemberClick && onMemberClick(c.authorId)}
+              >
+                <Avatar name={c.authorName} size={26} />
+              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ background: 'var(--bg-main)', borderRadius: '0 10px 10px 10px', padding: '6px 10px', fontSize: '0.82rem' }}>
-                  <span style={{ fontWeight: 700, marginRight: 5 }}>{c.authorName}</span>
+                  <span 
+                    style={{ fontWeight: 700, marginRight: 5, cursor: onMemberClick ? 'pointer' : 'default' }}
+                    onClick={() => onMemberClick && onMemberClick(c.authorId)}
+                  >
+                    {c.authorName}
+                  </span>
                   <span style={{ lineHeight: 1.5 }}>{c.text}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 2, paddingLeft: 3 }}>
@@ -275,7 +285,7 @@ const CommentThread = ({ comments = [], currentUser, canAdmin, onUpdate }) => {
 // ── Main GalleryView ──
 // posts + loading come from App.jsx (persists across view switches)
 // Mutations (add/delete/like/comment) still go directly to Supabase here
-const GalleryView = ({ familyId, posts = [], loading = false, currentUser, canEdit }) => {
+const GalleryView = ({ familyId, posts = [], loading = false, currentUser, canEdit, familyMembers, onMemberClick }) => {
   const [showForm, setShowForm] = useState(false);
   const [text, setText]         = useState('');
   const [location, setLocation] = useState('');
@@ -464,9 +474,19 @@ const GalleryView = ({ familyId, posts = [], loading = false, currentUser, canEd
 
                 {/* Header */}
                 <div style={{ padding: '12px 13px 7px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Avatar name={post.author_name} size={32} />
+                  <div 
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => onMemberClick && onMemberClick(post.author_id)}
+                  >
+                    <Avatar name={post.author_name} size={32} />
+                  </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{post.author_name}</div>
+                    <div 
+                      style={{ fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                      onClick={() => onMemberClick && onMemberClick(post.author_id)}
+                    >
+                      {post.author_name}
+                    </div>
                     <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span>{formatDate(post.created_at)}</span>
                       {post.location && <><span>·</span><MapPin size={9}/><span>{post.location}</span></>}
@@ -502,6 +522,7 @@ const GalleryView = ({ familyId, posts = [], loading = false, currentUser, canEd
                   currentUser={currentUser}
                   canAdmin={currentUser?.isAdmin}
                   onUpdate={(comments) => updateComments(post.id, comments)}
+                  onMemberClick={onMemberClick}
                 />
               </motion.div>
             );

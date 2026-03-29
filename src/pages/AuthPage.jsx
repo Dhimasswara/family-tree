@@ -8,7 +8,7 @@ const genCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
 const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMembers, setFamilyMembers }) => {
   const [tab, setTab] = useState('admin'); // 'admin' | 'member'
-  const [mode, setMode] = useState('login'); // 'login' | 'register' (admin only)
+  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot_password'
 
   // Admin form
   const [email, setEmail] = useState('');
@@ -16,6 +16,7 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
 
   // Register extra
   const [familyName, setFamilyName] = useState('');
@@ -28,7 +29,7 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
   const [pin, setPin] = useState('');
   const [loadingFamily, setLoadingFamily] = useState(false);
 
-  const reset = () => { setError(''); setLoading(false); };
+  const reset = () => { setError(''); setMsg(''); setLoading(false); };
 
   // ── Admin Login ──
   const handleAdminLogin = async (e) => {
@@ -85,6 +86,23 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
       onLoginSuccess(authData.user, familyData);
     } catch (err) {
       setError(err.message || 'Gagal mendaftar. Coba lagi.');
+    } finally { setLoading(false); }
+  };
+
+  // ── Forgot Password ──
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) { setError('Email wajib diisi.'); return; }
+    setLoading(true); setError(''); setMsg('');
+    if (!supabase) { setError('Supabase belum dikonfigurasi.'); setLoading(false); return; }
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (err) throw err;
+      setMsg('Tautan reset password berhasil dikirim! Silakan periksa email Anda.');
+    } catch (err) {
+      setError(err.message || 'Gagal mengirim tautan reset. Pastikan email terdaftar.');
     } finally { setLoading(false); }
   };
 
@@ -164,10 +182,10 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
 
           {/* Tabs */}
           <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-            <button style={tabStyle(tab === 'admin')} onClick={() => { setTab('admin'); setMode('login'); setError(''); }}>
+            <button style={tabStyle(tab === 'admin')} onClick={() => { setTab('admin'); setMode('login'); reset(); }}>
               👤 Login Admin
             </button>
-            <button style={tabStyle(tab === 'member')} onClick={() => { setTab('member'); setError(''); }}>
+            <button style={tabStyle(tab === 'member')} onClick={() => { setTab('member'); reset(); }}>
               👨‍👩‍👦 Login Anggota
             </button>
           </div>
@@ -178,11 +196,13 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
               {/* ── ADMIN TAB ── */}
               {tab === 'admin' && (
                 <motion.div key="admin" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 4 }}>{mode === 'login' ? 'Masuk sebagai Admin' : 'Daftar Admin Baru'}</h2>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 4 }}>
+                    {mode === 'login' ? 'Masuk sebagai Admin' : mode === 'register' ? 'Daftar Admin Baru' : 'Lupa Password'}
+                  </h2>
                   <p style={{ fontSize: '0.8rem', color: '#a8a29e', marginBottom: 24 }}>
-                    {mode === 'login' ? 'Admin yang mengelola data keluarga' : 'Buat akun & keluarga baru'}
+                    {mode === 'login' ? 'Admin yang mengelola data keluarga' : mode === 'register' ? 'Buat akun & keluarga baru' : 'Masukkan email Anda untuk menerima tautan reset'}
                   </p>
-                  <form onSubmit={mode === 'login' ? handleAdminLogin : handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <form onSubmit={mode === 'login' ? handleAdminLogin : mode === 'register' ? handleRegister : handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {mode === 'register' && (
                       <>
                         {inputWrapper(<User size={15} />, <input className="fi" style={{ paddingLeft: 38 }} placeholder="Nama lengkap Anda" value={adminName} onChange={e => setAdminName(e.target.value)} />)}
@@ -190,7 +210,7 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
                       </>
                     )}
                     {inputWrapper(<Mail size={15} />, <input className="fi" style={{ paddingLeft: 38 }} type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />)}
-                    {inputWrapper(<Lock size={15} />,
+                    {mode !== 'forgot_password' && inputWrapper(<Lock size={15} />,
                       <div style={{ position: 'relative' }}>
                         <input className="fi" style={{ paddingLeft: 38, paddingRight: 38 }} type={showPass ? 'text' : 'password'} placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
                         <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e' }}>
@@ -198,16 +218,24 @@ const AuthPage = ({ onNavigate, onLoginSuccess, onFamilyLoginSuccess, familyMemb
                         </button>
                       </div>
                     )}
+                    {mode === 'login' && (
+                      <div style={{ textAlign: 'right', marginTop: -6 }}>
+                        <button type="button" onClick={() => { setMode('forgot_password'); reset(); }} style={{ background: 'none', border: 'none', color: '#d97706', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
+                          Lupa Password?
+                        </button>
+                      </div>
+                    )}
                     {error && <p style={{ color: '#dc2626', fontSize: '0.78rem', fontWeight: 600, textAlign: 'center' }}>{error}</p>}
-                    <button type="submit" className="btn btn-primary" disabled={loading} style={{ justifyContent: 'center', padding: '13px', fontSize: '0.95rem', marginTop: 4 }}>
-                      {loading ? 'Memproses...' : mode === 'login' ? 'Masuk' : 'Daftar & Buat Keluarga'}
+                    {msg && <p style={{ color: '#059669', fontSize: '0.78rem', fontWeight: 600, textAlign: 'center' }}>{msg}</p>}
+                    <button type="submit" className="btn btn-primary" disabled={loading || (mode === 'forgot_password' && msg !== '')} style={{ justifyContent: 'center', padding: '13px', fontSize: '0.95rem', marginTop: 4 }}>
+                      {loading ? 'Memproses...' : mode === 'login' ? 'Masuk' : mode === 'register' ? 'Daftar & Buat Keluarga' : 'Kirim Tautan'}
                     </button>
                   </form>
                   <div style={{ textAlign: 'center', marginTop: 18, fontSize: '0.8rem', color: '#a8a29e' }}>
                     {mode === 'login' ? (
-                      <>Belum punya akun? <button onClick={() => { setMode('register'); setError(''); }} style={{ background: 'none', border: 'none', color: '#d97706', fontWeight: 700, cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>Daftar Gratis</button></>
+                      <>Belum punya akun? <button onClick={() => { setMode('register'); reset(); }} style={{ background: 'none', border: 'none', color: '#d97706', fontWeight: 700, cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>Daftar Gratis</button></>
                     ) : (
-                      <>Sudah punya akun? <button onClick={() => { setMode('login'); setError(''); }} style={{ background: 'none', border: 'none', color: '#d97706', fontWeight: 700, cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>Masuk</button></>
+                      <>Sudah punya akun / ingat password? <button onClick={() => { setMode('login'); reset(); }} style={{ background: 'none', border: 'none', color: '#d97706', fontWeight: 700, cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>Masuk</button></>
                     )}
                   </div>
                 </motion.div>

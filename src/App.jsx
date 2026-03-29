@@ -21,7 +21,7 @@ import {
   Trash2, Edit2, Save, X, Camera, Heart, Baby, Sun, Moon, Search,
   Divide, Settings, Download, Upload, LogIn, LogOut, Lock, Unlock, ShieldCheck, UserCog,
   MapPin, Briefcase, GraduationCap, Phone, FileText,
-  Key, Crown, Star, Shield, ChevronDown, Copy, RefreshCw, Bell
+  Key, Crown, Star, Shield, ChevronDown, Copy, RefreshCw, Bell, MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
@@ -30,6 +30,7 @@ import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import MapView from './pages/MapView';
 import GalleryView from './pages/GalleryView';
+import MessagesView from './pages/MessagesView';
 import { getPlanConfig, PLANS } from './config/plans';
 
 // Error Boundary sederhana untuk menangkap crash
@@ -84,15 +85,27 @@ const getCroppedImg = async (imageSrc, pixelCrop) => {
 };
 
 // Family Group Background Node
-const FamilyGroupNode = ({ style }) => (
+const FamilyGroupNode = ({ data, style }) => (
   <div style={{
     width: style?.width,
     height: style?.height,
-    borderRadius: 20,
-    background: 'rgba(217,119,6,0.04)',
-    border: '1.5px dashed rgba(217,119,6,0.2)',
+    borderRadius: 24,
+    background: 'rgba(217,119,6,0.03)',
+    border: '2px dashed rgba(217,119,6,0.25)',
     pointerEvents: 'none',
-  }} />
+    position: 'relative',
+    zIndex: -1,
+  }}>
+    {data?.label && (
+      <div style={{
+         position: 'absolute', top: 12, left: 24,
+         color: 'rgba(217,119,6,0.6)', fontSize: '0.9rem', fontWeight: 800,
+         textTransform: 'uppercase', letterSpacing: 1.5
+      }}>
+        {data.label}
+      </div>
+    )}
+  </div>
 );
 
 const nodeTypes = {
@@ -350,6 +363,7 @@ const App = () => {
       tagline: 'Manajemen Nasab Dinamis',
       logoMode: 'icon',
       logoUrl: '',
+      themeVariant: 'classic', // classic, emerald, royal, midnight, sepia
       isPremium: false,
       premiumCode: 'FAMTREE-PREMIUM',
     };
@@ -379,6 +393,7 @@ const App = () => {
   const [galleryPosts, setGalleryPosts]     = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [notifications, setNotifications]   = useState([]);
+  const [unreadDmCount, setUnreadDmCount]    = useState(0);
   const [notifOpen, setNotifOpen]           = useState(false);
   const prevGalleryPostsRef                 = useRef(null);
   // Toast, ProModal, ConfirmModal (mengganti alert/confirm bawaan JS)
@@ -387,6 +402,7 @@ const App = () => {
   const [confirmModal, setConfirmModal] = useState(null); // { message, onConfirm }
   // View modal (klik node di tree)
   const [viewTarget, setViewTarget] = useState(null);
+  const [targetChatId, setTargetChatId] = useState(null);
   // Admin profile edit
   const [profileName,        setProfileName]        = useState('');
   const [profileEmail,       setProfileEmail]       = useState('');
@@ -411,6 +427,12 @@ const App = () => {
     return localStorage.getItem('_cachedPlan') || 'free';
   });
   const [authReady, setAuthReady] = useState(false);
+  
+  // Password Recovery State
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoveryError, setRecoveryError] = useState(null);
 
   const planConfig = getPlanConfig(userPlan);
   const canAddMember = familyMembers.length < planConfig.maxMembers;
@@ -423,20 +445,47 @@ const App = () => {
   const openConfirm = useCallback((message, onConfirm) => setConfirmModal({ message, onConfirm }), []);
 
   const handleDownloadTree = useCallback(async () => {
+    if (!planConfig.features.downloadImage) {
+      openProModal('Fitur Download Gambar Pohon tersedia di paket Starter ke atas.');
+      return;
+    }
     try {
-      rfRef.current?.fitView({ duration: 0 });
-      await new Promise(r => setTimeout(r, 400));
-
-      const flowEl = document.querySelector('.react-flow__viewport');
-      const wrapper = document.querySelector('.react-flow');
-      if (!wrapper) return;
-
       showToast('Menyiapkan gambar...', 'info');
+      await new Promise(r => setTimeout(r, 300)); // wait UI updates
+
+      const viewport = document.querySelector('.react-flow__viewport');
+      if (!viewport) return;
+
+      // Hitung dimensi aktual dari Node
+      const currentNodes = rfRef.current?.getNodes() || [];
+      if (currentNodes.length === 0) return;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      currentNodes.forEach(n => {
+          const w = n.style?.width || (n.type === 'union' ? 20 : 158);
+          const h = n.style?.height || (n.type === 'union' ? 20 : 145);
+          const x = n.position.x;
+          const y = n.position.y;
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x + w > maxX) maxX = x + w;
+          if (y + h > maxY) maxY = y + h;
+      });
+
+      const pad = 100;
+      const imgWidth = maxX - minX + (pad * 2);
+      const imgHeight = maxY - minY + (pad * 2);
+
+      const originalTransform = viewport.style.transform;
+      viewport.style.transform = `translate(${-minX + pad}px, ${-minY + pad}px) scale(1)`;
 
       const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(wrapper, {
+      const dataUrl = await toPng(viewport, {
         backgroundColor: theme === 'dark' ? '#141210' : '#f7f4ef',
+        width: imgWidth,
+        height: imgHeight,
         pixelRatio: 1.5,
+        style: { width: imgWidth, height: imgHeight, transform: `translate(${-minX + pad}px, ${-minY + pad}px) scale(1)` },
         filter: (node) => {
           if (node?.classList?.contains('react-flow__minimap')) return false;
           if (node?.classList?.contains('react-flow__controls')) return false;
@@ -444,6 +493,7 @@ const App = () => {
           return true;
         },
       });
+      viewport.style.transform = originalTransform;
 
       // Add info watermark via canvas
       const img = new Image();
@@ -612,6 +662,9 @@ const App = () => {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        setShowRecoveryModal(true);
+      }
       const u = session?.user ?? null;
       setUser(u);
       if (u) {
@@ -643,6 +696,25 @@ const App = () => {
     setCurrentFamily(null);
     setAppPage('landing');
     setView('tree');
+  };
+
+  const handleRecoverySubmit = async (e) => {
+    e.preventDefault();
+    if (!recoveryPassword || recoveryPassword.length < 6) {
+      setRecoveryError('Password minimal 6 karakter.');
+      return;
+    }
+    setRecoveryLoading(true); setRecoveryError(null);
+    const { error } = await supabase.auth.updateUser({ password: recoveryPassword });
+    setRecoveryLoading(false);
+    if (error) {
+      setRecoveryError(error.message || 'Gagal mereset password.');
+    } else {
+      setShowRecoveryModal(false);
+      setRecoveryPassword('');
+      showToast('Password berhasil diperbarui! Silakan Login.', 'success');
+      setAppPage('auth');
+    }
   };
 
   // Sync profil form saat user login/berubah
@@ -819,8 +891,31 @@ const App = () => {
     const myId = user?.id || familyUser?.id;
     if (!supabase || !fid || !myId) return;
     supabase.from('notifications').select('*').eq('family_id', fid).eq('user_id', myId)
-      .order('time', { ascending: false }).limit(30)
+      .order('time', { ascending: false }).limit(50)
       .then(({ data }) => { if (data) setNotifications(data); });
+  }, [currentFamily?.id, user?.id, familyUser?.id]);
+
+  // ── Unread DM count: fetch on load + realtime ──
+  useEffect(() => {
+    const fid = currentFamily?.id;
+    const myId = familyUser?.id || user?.id;
+    if (!supabase || !fid || !myId) return;
+
+    const fetchUnread = () => {
+      supabase.from('direct_messages').select('id', { count: 'exact', head: true })
+        .eq('family_id', fid).eq('receiver_id', myId).eq('read', false)
+        .then(({ count }) => { setUnreadDmCount(count || 0); });
+    };
+    fetchUnread();
+
+    const dmChannel = supabase.channel(`dm-badge-${fid}-${myId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'direct_messages',
+        filter: `family_id=eq.${fid}`
+      }, () => { fetchUnread(); })
+      .subscribe();
+
+    return () => { supabase.removeChannel(dmChannel); };
   }, [currentFamily?.id, user?.id, familyUser?.id]);
 
   // ── Gallery notifications: detect new posts, likes, comments, replies ──
@@ -842,7 +937,7 @@ const App = () => {
       if (!old) {
         // New post by someone else
         if (post.author_id !== myId) {
-          newNotifs.push({ id: mkId(), type: 'post', text: `${post.author_name} menambahkan postingan baru`, time: now, read: false });
+          newNotifs.push({ id: mkId(), type: 'post', message: `${post.author_name} menambahkan postingan baru`, time: now, read: false });
         }
         return;
       }
@@ -851,7 +946,7 @@ const App = () => {
       if (post.author_id === myId) {
         const added = (post.liked_by || []).filter(id => !(old.liked_by || []).includes(id) && id !== myId);
         if (added.length > 0) {
-          newNotifs.push({ id: mkId(), type: 'like', text: `Seseorang menyukai postinganmu`, time: now, read: false });
+          newNotifs.push({ id: mkId(), type: 'like', message: `Seseorang menyukai postinganmu`, time: now, read: false });
         }
       }
 
@@ -864,16 +959,16 @@ const App = () => {
         if (!oldC) {
           // New top-level comment
           if (post.author_id === myId && newC.authorId !== myId) {
-            newNotifs.push({ id: mkId(), type: 'comment', text: `${newC.authorName} mengomentari postinganmu`, time: now, read: false });
+            newNotifs.push({ id: mkId(), type: 'comment', message: `${newC.authorName} mengomentari postinganmu`, time: now, read: false });
           }
         } else {
           // New replies
           const addedReplies = (newC.replies || []).filter(r => !(oldC.replies || []).find(or => or.id === r.id) && r.authorId !== myId);
           addedReplies.forEach(r => {
             if (newC.authorId === myId) {
-              newNotifs.push({ id: mkId(), type: 'reply', text: `${r.authorName} membalas komentarmu`, time: now, read: false });
+              newNotifs.push({ id: mkId(), type: 'reply', message: `${r.authorName} membalas komentarmu`, time: now, read: false });
             } else if (post.author_id === myId) {
-              newNotifs.push({ id: mkId(), type: 'reply', text: `${r.authorName} membalas di postinganmu`, time: now, read: false });
+              newNotifs.push({ id: mkId(), type: 'reply', message: `${r.authorName} membalas di postinganmu`, time: now, read: false });
             }
           });
         }
@@ -881,9 +976,10 @@ const App = () => {
     });
 
     if (newNotifs.length > 0) {
-      setNotifications(prev => [...newNotifs, ...prev].slice(0, 30));
+      setNotifications(prev => [...newNotifs, ...prev].slice(0, 50));
       if (supabase && fid) {
-        supabase.from('notifications').insert(newNotifs.map(n => ({ ...n, family_id: fid, user_id: myId })));
+        supabase.from('notifications').insert(newNotifs.map(n => ({ ...n, family_id: fid, user_id: myId })))
+          .then(({ error }) => { if (error) console.error('Notif insert error:', error); });
       }
     }
     prevGalleryPostsRef.current = galleryPosts;
@@ -955,7 +1051,9 @@ const App = () => {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    const variant = appConfig.themeVariant || 'classic';
+    document.documentElement.setAttribute('data-variant', variant);
+  }, [theme, appConfig.themeVariant]);
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
@@ -964,52 +1062,36 @@ const App = () => {
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
     const isRapih = layoutKey > 0;
-
-    // Sesuaikan parameter tinggi Box dengan render asli
     const nodeWidth  = 158;
     const nodeHeight = isRapih ? 130 : 145;
+    const spacingX = isRapih ? nodeWidth + 30 : nodeWidth + 80;
 
-    // Compact mode: spacingX pasangan jauh lebih kecil agar garis horizontal memendek
-    const spacingX = isRapih ? nodeWidth + 25 : nodeWidth + 80;
-    
-    // Kalkulasi Jarak Darah (Bloodline Distance) dengan BFS untuk menentukan Tuan Rumah vs Pendatang (In-laws) sejati
+    // 1. Identify Bloodlines and Uncles/Aunts
     const bloodlineDist = {};
     const queue = [];
     nodesParam.forEach(n => {
         const m = n.data;
-        if (!m || m.type === 'union') return;
+        if (!m || n.type === 'union') return;
         
         let isBloodline = false;
         if (m.fatherId || m.motherId) {
-            isBloodline = true; // Punya ortu di sistem, otomatis darah murni
+            isBloodline = true; 
         } else {
-            // Tidak punya ortu = Kandidat Leluhur (Root) ATAU Pendatang (In-Law Murni)
-            // Syarat menjadi Leluhur Root Absolut: Harus Punya Anak, DAN SEMUA PASANGANNYA JUGA YATIM PIATU di sistem.
-            const isParent = nodesParam.some(child => {
-                const cData = child.data;
-                return cData && (cData.fatherId === m.id || cData.motherId === m.id);
-            });
-            
+            const isParent = nodesParam.some(child => child.data && (child.data.fatherId === m.id || child.data.motherId === m.id));
             if (isParent) {
-                // Cek mendalam apakah ada pasangannya (secara berantai) yang PUNYA ortu 
                 const checkBloodlineSpouseR = (id, visited = new Set()) => {
                     if (visited.has(id)) return false;
                     visited.add(id);
                     const spNode = nodesParam.find(x => x.id === id)?.data;
                     if (spNode && (spNode.fatherId || spNode.motherId)) return true;
-                    // Lacak pasangan dari pasangannya secara rekursif mengantisipasi rantai panjang
                     for (let sp of (spNode?.spouses || [])) {
                         if (checkBloodlineSpouseR(sp.id, visited)) return true;
                     }
                     return false;
                 };
-                
-                if (!checkBloodlineSpouseR(m.id)) {
-                    isBloodline = true; // Fix Leluhur Murni!
-                }
+                if (!checkBloodlineSpouseR(m.id)) isBloodline = true;
             }
         }
-
         if (isBloodline) {
             bloodlineDist[m.id] = 0;
             queue.push(m.id);
@@ -1031,26 +1113,26 @@ const App = () => {
     }
 
     nodesParam.forEach(n => {
-        if (n.type === 'union') {
-            bloodlineDist[n.id] = 0; // Union Nodes selalu dihitung kalkulasi Utama
-        } else if (bloodlineDist[n.id] === undefined) {
-            bloodlineDist[n.id] = 999;
-        }
+        if (n.type === 'union') bloodlineDist[n.id] = 0;
+        else if (bloodlineDist[n.id] === undefined) bloodlineDist[n.id] = 999;
     });
 
-    // Inlaw murni adalah SIAPAPUN yang tidak memilki darah orisinil (Distance > 0)
-    const pureInLawsSet = new Set(Object.keys(bloodlineDist).filter(id => bloodlineDist[id] > 0));
+    // 2. Identify Virtual Family Clusters
+    const virtualFamilies = {}; 
+    const personToVirtual = {}; 
 
-    // Temukan Map Pasangan Utama -> [Pasangan1, Pasangan2, ...] ditarik dari relasi BFS hirarkis absolut
-    const marriages = {}; 
-    const pureInLawCounts = {};
+    nodesParam.forEach(n => {
+        if (n.type !== 'union') {
+            virtualFamilies[n.id] = [n.id];
+            personToVirtual[n.id] = n.id;
+        }
+    });
 
     edgesParam.forEach(e => {
         if (e.id.startsWith('e-spouse-')) {
             const nodeA = nodesParam.find(n => n.id === e.source)?.data;
             const nodeB = nodesParam.find(n => n.id === e.target)?.data;
             if (nodeA && nodeB) {
-                // Yang jarak darahnya lebih kecil adalah Tuan Rumah (Main), sisanya menumpang
                 let mainId, spouseId;
                 if (bloodlineDist[nodeA.id] < bloodlineDist[nodeB.id]) {
                     mainId = nodeA.id; spouseId = nodeB.id;
@@ -1061,285 +1143,134 @@ const App = () => {
                     spouseId = mainId === nodeA.id ? nodeB.id : nodeA.id;
                 }
 
-                if (!marriages[mainId]) marriages[mainId] = [];
-                if (!marriages[mainId].includes(spouseId)) {
-                    marriages[mainId].push(spouseId);
+                const oldVirtual = personToVirtual[spouseId];
+                if (oldVirtual !== mainId && virtualFamilies[oldVirtual]) {
+                    virtualFamilies[oldVirtual].forEach(id => {
+                        if (!virtualFamilies[mainId].includes(id)) {
+                            virtualFamilies[mainId].push(id);
+                        }
+                        personToVirtual[id] = mainId;
+                    });
+                    delete virtualFamilies[oldVirtual];
                 }
             }
         }
     });
 
-    // Compact mode: ranksep & nodesep jauh lebih kecil → garis pendek & rapat
-    dagreGraph.setGraph({ rankdir: 'TB', ranksep: isRapih ? 38 : 90, nodesep: isRapih ? 18 : 50 });
+    // 3. Setup Dagre Graph using Virtual Families
+    dagreGraph.setGraph({ rankdir: 'TB', ranksep: isRapih ? 70 : 120, nodesep: isRapih ? 50 : 90 });
 
-    const getTotalSpouseCount = (id, visited = new Set()) => {
-        if (visited.has(id)) return 0;
-        visited.add(id);
-        const sIds = marriages[id] || [];
-        let total = sIds.length;
-        sIds.forEach(s => total += getTotalSpouseCount(s, visited));
-        return total;
-    };
-
-    nodesParam.forEach((node) => {
-      // JANGAN masukkan Pure In-Law ke perhitungan Dagre awal agar grid saudara tidak koyak
-      if (pureInLawsSet.has(node.id)) return;
-
-      let extraWidth = 0;
-      const totalSpouses = getTotalSpouseCount(node.id);
-      if (totalSpouses > 0) {
-          extraWidth = spacingX; // Minimal 1 pasangan mutlak membutuhkan clearance 1 kolom di Dagre
-      }
-
-      dagreGraph.setNode(node.id, {
-        width: node.type === 'union' ? 20 : (nodeWidth + extraWidth),
-        height: node.type === 'union' ? 20 : nodeHeight // Biarkan height normal
-      });
+    Object.keys(virtualFamilies).forEach(anchorId => {
+        const members = virtualFamilies[anchorId];
+        dagreGraph.setNode(anchorId, {
+            width: members.length * spacingX,
+            height: nodeHeight
+        });
     });
 
-    const unionParents = {};
-    edgesParam.forEach((edge) => {
-        if (edge.target.startsWith('union-')) {
-            if (!pureInLawsSet.has(edge.source)) {
-                if (!unionParents[edge.target]) unionParents[edge.target] = [];
-                unionParents[edge.target].push(edge.source);
+    // 4. Edges between Virtual Families (from Parents to Child)
+    const processedChildEdges = new Set();
+    nodesParam.forEach(n => {
+        const m = n.data;
+        if (!m || n.type === 'union') return;
+        
+        let parentVirtual = null;
+        if (m.fatherId && m.motherId) {
+            parentVirtual = personToVirtual[m.fatherId]; 
+        } else if (m.fatherId) {
+            parentVirtual = personToVirtual[m.fatherId];
+        } else if (m.motherId) {
+            parentVirtual = personToVirtual[m.motherId];
+        }
+
+        if (parentVirtual && parentVirtual !== personToVirtual[m.id]) {
+            const edgeId = `${parentVirtual}->${personToVirtual[m.id]}`;
+            if (!processedChildEdges.has(edgeId)) {
+                dagreGraph.setEdge(parentVirtual, personToVirtual[m.id], { weight: 1 });
+                processedChildEdges.add(edgeId);
             }
         }
     });
 
-    edgesParam.forEach((edge) => {
-      if (pureInLawsSet.has(edge.source) || pureInLawsSet.has(edge.target)) {
-          // Cegah Union Node atau Anak Tiri (bawaan pendatang) kehilangan akar parent karena pasangannya disembunyikan
-          if (edge.target.startsWith('union-') || edge.id.startsWith('e-single-')) {
-              if (edge.target.startsWith('union-') && (!unionParents[edge.target] || unionParents[edge.target].length === 0)) {
-                  // Cari Tuan Rumah (Anchor yg Dist=0) paling dekat
-                  const findAnchor = (id) => {
-                      if (bloodlineDist[id] === 0) return id;
-                      const mNodeData = nodesParam.find(n => n.id === id)?.data;
-                      for (let sp of (mNodeData?.spouses || [])) {
-                          if (bloodlineDist[sp.id] < bloodlineDist[id]) return findAnchor(sp.id);
-                      }
-                      return null;
-                  };
-                  const anchorId = findAnchor(edge.source);
-                  if (anchorId) {
-                      dagreGraph.setEdge(anchorId, edge.target, { weight: 0 }); // Ikat Union ini ke Ortu Asli!
-                      unionParents[edge.target] = [anchorId];
-                  }
-              } else if (edge.id.startsWith('e-single-')) {
-                  const findAnchor = (id) => {
-                      if (bloodlineDist[id] === 0) return id;
-                      const mNodeData = nodesParam.find(n => n.id === id)?.data;
-                      for (let sp of (mNodeData?.spouses || [])) {
-                          if (bloodlineDist[sp.id] < bloodlineDist[id]) return findAnchor(sp.id);
-                      }
-                      return null;
-                  };
-                  const anchorId = findAnchor(edge.source);
-                  if (anchorId) {
-                      dagreGraph.setEdge(anchorId, edge.target, { weight: 0 }); // Ikat Anak Tiri ke Tuan Rumah Murni (Natively Routing)
-                  }
-              }
-          }
-          return;
-      }
-      if (!edge.id.includes('e-spouse-')) {
-        dagreGraph.setEdge(edge.source, edge.target);
-      }
-    });
-
+    // 5. Execute Dagre Layout
     dagre.layout(dagreGraph);
 
-    // KOREKSI VERTIKAL NATIVE: Evaluasi tumpukan poligami dan sobek grafik Dagre ke bawah 
-    // untuk menyediakan jalur vertikal kosong yang aman diisi jatuh oleh istri-istri tambahan.
-    const rankTears = {};
-    nodesParam.forEach(node => {
-         const totalSpouses = getTotalSpouseCount(node.id);
-         if (totalSpouses > 1) {
-             const dNode = dagreGraph.node(node.id);
-             if (dNode) {
-                 const rankY = Math.round(dNode.y); 
-                 const requiredTear = (totalSpouses - 1) * (nodeHeight + 25);
-                 if (!rankTears[rankY] || requiredTear > rankTears[rankY]) {
-                     rankTears[rankY] = requiredTear;
-                 }
-             }
-         }
+    // 6. Expand Virtual Families and Assign Actual Coordinate to Individual Nodes
+    const finalPositions = {};
+
+    Object.keys(virtualFamilies).forEach(anchorId => {
+        const members = virtualFamilies[anchorId];
+        const vNode = dagreGraph.node(anchorId);
+        if (!vNode) return;
+
+        let sortedMembers = [];
+        const isAnchorMale = nodesParam.find(n => n.id === anchorId)?.data?.gender === 'male';
+        const spouses = members.filter(id => id !== anchorId);
+        
+        if (isAnchorMale || spouses.length === 0) {
+             sortedMembers = [anchorId, ...spouses]; // Male on left, wives on right
+        } else {
+             sortedMembers = [spouses[0], anchorId, ...spouses.slice(1)]; // Husband on left, Female anchor in middle
+        }
+        
+        const startX = vNode.x - ((sortedMembers.length - 1) * spacingX) / 2;
+        
+        sortedMembers.forEach((id, index) => {
+            finalPositions[id] = {
+                x: startX + index * spacingX,
+                y: vNode.y
+            };
+        });
     });
 
-    const sortedTears = Object.keys(rankTears).map(Number).sort((a,b) => a - b);
-    const originalYs = {};
+    // 7. Place Union Nodes
     nodesParam.forEach(n => {
-        const dN = dagreGraph.node(n.id);
-        if (dN) originalYs[n.id] = dN.y; 
-    });
-
-    nodesParam.forEach(node => {
-         const dNode = dagreGraph.node(node.id);
-         if (dNode) {
-              let shift = 0;
-              sortedTears.forEach(tearY => {
-                   // Sobek / turunkan semua generasi yang secara vertikal berada di bawah anchor ini!
-                   if (originalYs[node.id] > tearY + 10) { 
-                        shift += rankTears[tearY];
-                   }
-              });
-              dNode.y += shift;
-         }
-    });
-
-    // URUTKAN eksekusi berdasarkan Distance mulai dari darah murni -> InLaw ke-1 -> InLaw ke-2
-    // Tracker absolute per kolom untuk memastikan jaminan poligami berbaris rapi di kolom ordonya
-    const establishedHusbandX = {};
-    const establishedWifeX = {};
-    const nextWifeY = {};
-
-    const sortedMainIds = Object.keys(marriages).sort((a, b) => bloodlineDist[a] - bloodlineDist[b]);
-
-    sortedMainIds.forEach(mainId => {
-        const spouseIds = marriages[mainId];
-        const mNode = dagreGraph.node(mainId);
-        if (!mNode) return;
-
-        // Offset maksimum untuk menggaransi semua anak disejajarkan poligami
-        // Jarak seragam sempurna 60px dengan natif algoritma margin nodesep Dagre agar garis kuning merata global
-        const spacingX = nodeWidth + 60;
-
-        for (let i = 0; i < spouseIds.length; i++) {
-            let spouseId = spouseIds[i];
-            let sNode = dagreGraph.node(spouseId);
+        if (n.type === 'union') {
+            const unionIdParams = n.id.replace('union-', '').split('-');
+            const id1 = unionIdParams[0];
+            const id2 = unionIdParams[1];
+            const pos1 = finalPositions[id1];
+            const pos2 = finalPositions[id2];
             
-            let unionId = `union-${mainId}-${spouseId}`;
-            let uNode = dagreGraph.node(unionId);
-            if (!uNode) {
-                unionId = `union-${spouseId}-${mainId}`;
-                uNode = dagreGraph.node(unionId);
-            }
-
-            if (!sNode && pureInLawsSet.has(spouseId)) {
-                // Node In-Law tidak dihitung Dagre, inisiasi node palsu
-                sNode = { x: 0, y: 0, width: nodeWidth, height: nodeHeight };
-                dagreGraph.setNode(spouseId, sNode); 
-            }
-
-            if (!sNode) continue;
-
-            const currentOffsetY = i * (nodeHeight + 25);
-
-            const mData = nodesParam.find(n => n.id === mainId)?.data;
-            const mainIsMale = mData?.gender === 'male';
-
-            if (establishedHusbandX[mainId] === undefined) {
-                if (pureInLawsSet.has(spouseId)) {
-                    const centerX = mNode.x;
-                    const targetY = mNode.y;
-
-                    const husbandX = centerX - spacingX / 2;
-                    const wifeX = centerX + spacingX / 2;
-                    
-                    if (mainIsMale) {
-                        mNode.x = husbandX;
-                        sNode.x = wifeX; // Istri pertama di kanan
-                    } else {
-                        mNode.x = wifeX; // Istri pertama di kanan
-                        sNode.x = husbandX; // Suami di kiri
-                    }
-                    
-                    sNode.y = targetY;
-                    
-                    // Simpan koordinat Istri/Suami untuk diwariskan ke rantai Poligami di iterasi/mainId berikutnya
-                    establishedHusbandX[mainId] = husbandX;
-                    establishedHusbandX[spouseId] = husbandX;
-                    establishedWifeX[mainId] = wifeX;
-                    establishedWifeX[spouseId] = wifeX;
-                    nextWifeY[mainId] = targetY + nodeHeight + 25;
-                    nextWifeY[spouseId] = targetY + nodeHeight + 25;
-                    
-                    if (uNode) {
-                        uNode.x = centerX;
-                        uNode.y = targetY + 35;
-                    }
-                } else {
-                    // Cross-Marriage (Sepupu - keduanya punya ortu)
-                    const targetY = Math.max(mNode.y, sNode.y); 
-                    sNode.y = targetY;
-                    mNode.y = targetY;
-
-                    const husbandX = mainIsMale ? mNode.x : sNode.x;
-                    const wifeX = mainIsMale ? sNode.x : mNode.x;
-
-                    // Harus dipaksa sesuai posisi Suami Kiri, Istri Kanan karena Dagre mungkin menata kebalik
-                    if (mainIsMale) {
-                        mNode.x = husbandX;
-                        sNode.x = wifeX;
-                    } else {
-                        mNode.x = wifeX;
-                        sNode.x = husbandX;
-                    }
-
-                    establishedHusbandX[mainId] = husbandX;
-                    establishedHusbandX[spouseId] = husbandX;
-                    establishedWifeX[mainId] = wifeX;
-                    establishedWifeX[spouseId] = wifeX;
-                    nextWifeY[mainId] = targetY + nodeHeight + 25;
-                    nextWifeY[spouseId] = targetY + nodeHeight + 25;
-                    
-                    if (uNode) {
-                        uNode.x = (husbandX + wifeX) / 2;
-                        uNode.y = targetY + 35; 
-                    }
-                }
+            if (pos1 && pos2) {
+                finalPositions[n.id] = {
+                    x: (pos1.x + pos2.x) / 2,
+                    y: pos1.y + (nodeHeight / 2) + 15
+                };
             } else {
-                // Eksekusi untuk Istri Ke-2/Ke-3 atau Poligami lainnya
-                const spouseData = nodesParam.find(n => n.id === spouseId)?.data;
-                const isHusband = spouseData?.gender === 'male';
-
-                if (isHusband) {
-                    sNode.x = establishedHusbandX[mainId];
-                } else {
-                    sNode.x = establishedWifeX[mainId];
-                }
-                
-                // Gunakan Tracker Y untuk penumpukan
-                sNode.y = nextWifeY[mainId];
-                nextWifeY[mainId] += nodeHeight + 25; // Lanjutkan tumpukan untuk berjaga-jaga jikada istri ke-3
-                nextWifeY[spouseId] = nextWifeY[mainId]; // Pewarisan
-
-                if (uNode) {
-                     uNode.x = (establishedHusbandX[mainId] + establishedWifeX[mainId]) / 2;
-                     uNode.y = sNode.y + 35; 
-                }
+                finalPositions[n.id] = { x: pos1 ? pos1.x : pos2 ? pos2.x : 0, y: pos1 ? pos1.y : pos2 ? pos2.y : 0 };
             }
         }
     });
 
-    // KOREKSI ARAH GARIS (EDGE HANDLES): Mengatasi Yellow Line terpelintir muter-muter
-    // Karena letak Pria/Wanita bisa saja Terbalik antara Kiri/Kanan, tentukan colokannya dinamis
+    // 8. Dynamic Edge Handles Assignment
     edgesParam.forEach(edge => {
         if (edge.id.startsWith('e-spouse-') || edge.id.startsWith('e-union-f-') || edge.id.startsWith('e-union-m-')) {
-            const sourceNode = dagreGraph.node(edge.source);
-            const targetNode = dagreGraph.node(edge.target);
-            if (sourceNode && targetNode) {
-                // Check mana yang ada di sisi lebih kiri layout
-                const isSourceOnLeft = sourceNode.x < targetNode.x;
+            const pSource = finalPositions[edge.source];
+            const pTarget = finalPositions[edge.target];
+            if (pSource && pTarget) {
+                const isSourceOnLeft = pSource.x <= pTarget.x;
                 if (edge.id.startsWith('e-spouse-')) {
                      edge.sourceHandle = isSourceOnLeft ? 'right-source' : 'left-source';
                      edge.targetHandle = isSourceOnLeft ? 'left-target' : 'right-target';
-                } else if (edge.id.startsWith('e-union-f-') || edge.id.startsWith('e-union-m-')) {
+                } else {
                      edge.sourceHandle = isSourceOnLeft ? 'right-source' : 'left-source';
                      edge.targetHandle = isSourceOnLeft ? 'left' : 'right';
                 }
             }
+        } else if (edge.id.startsWith('e-child-') || edge.id.startsWith('e-single-')) {
+            edge.sourceHandle = 'bottom';
+            edge.targetHandle = 'top';
         }
     });
 
     return nodesParam.map((node) => {
-      const nodeWithPosition = dagreGraph.node(node.id);
+      const pos = finalPositions[node.id];
       const width = node.type === 'union' ? 20 : nodeWidth;
       const height = node.type === 'union' ? 20 : nodeHeight;
       
-      const x = nodeWithPosition?.x ?? Math.random() * 500;
-      const y = nodeWithPosition?.y ?? Math.random() * 500;
+      const x = pos?.x ?? Math.random() * 500;
+      const y = pos?.y ?? Math.random() * 500;
 
       return {
         ...node,
@@ -1538,9 +1469,11 @@ const App = () => {
       if (!e.type) e.type = 'smoothstep';
       // Spouse edges: solid amber with subtle label
       if (e.id.startsWith('e-spouse-')) {
-        e.label = e.style?.strokeDasharray ? 'Cerai' : 'Menikah';
-        e.labelStyle = { fontSize: 9, fontWeight: 700, fontFamily: 'Outfit,sans-serif', fill: e.style?.strokeDasharray ? '#94a3b8' : '#d97706', background: 'transparent' };
-        e.labelBgStyle = { fill: 'transparent' };
+        const isDivorced = !!e.style?.strokeDasharray;
+        e.label = isDivorced ? 'Bercerai' : 'Menikah';
+        e.labelStyle = { fontSize: 10, fontWeight: 800, fontFamily: 'Outfit,sans-serif', fill: isDivorced ? '#ef4444' : '#d97706' };
+        e.labelBgStyle = { fill: theme === 'dark' ? '#1e293b' : '#ffffff', fillOpacity: 0.95, stroke: isDivorced ? '#ef4444' : '#d97706', strokeWidth: 1, rx: 6 };
+        e.labelBgPadding = [6, 4];
       }
       // Child edges: dashed subtle
       if (e.id.startsWith('e-child-') || e.id.startsWith('e-single-')) {
@@ -1556,48 +1489,57 @@ const App = () => {
     const computedNodes = getLayoutedElementsLocal(finalNodes, edges);
 
     // ── Family Group Background Nodes ──────────────────────────────────────
-    // Untuk setiap pasangan yang punya anak, buat background rect transparan
-    // yang mengelompokkan saudara kandung secara visual
     const groupNodes = [];
     const processedGroups = new Set();
-    const PAD = 24;
+    const PAD = 30;
 
-    sortedMembers.forEach(m => {
-      if (!m.fatherId || !m.motherId) return;
-      const groupKey = [m.fatherId, m.motherId].sort().join('-');
-      if (processedGroups.has(groupKey)) return;
-      processedGroups.add(groupKey);
+    edges.forEach(e => {
+        if (e.id.startsWith('e-spouse-')) {
+            const hId = e.source; 
+            const wId = e.target; 
+            const groupKey = `${hId}-${wId}`;
+            if (processedGroups.has(groupKey)) return;
+            processedGroups.add(groupKey);
 
-      // Kumpulkan semua anak dari pasangan ini
-      const siblings = sortedMembers.filter(c =>
-        (c.fatherId === m.fatherId && c.motherId === m.motherId)
-      );
-      if (siblings.length < 2) return; // Group hanya jika ≥ 2 anak
+            // Cari anak-anak milik pasangan ini
+            const children = sortedMembers.filter(c => 
+               (c.fatherId === hId && c.motherId === wId) || 
+               (c.fatherId === wId && c.motherId === hId)
+            );
 
-      // Cari posisi masing-masing anak dari computedNodes
-      const sibPositions = siblings
-        .map(c => computedNodes.find(n => n.id === c.id))
-        .filter(Boolean);
+            // Group melingkupi Suami, Istri, dan Anak-Anaknya sekaligus
+            const groupMemberIds = [hId, wId, ...children.map(c => c.id)];
+            
+            const memberPositions = groupMemberIds
+               .map(id => computedNodes.find(n => n.id === id))
+               .filter(Boolean);
 
-      if (sibPositions.length < 2) return;
+            if (memberPositions.length > 0) {
+               const xs = memberPositions.map(n => n.position.x);
+               const ys = memberPositions.map(n => n.position.y);
+               const minX = Math.min(...xs) - PAD;
+               const minY = Math.min(...ys) - PAD - 35; // ruang ekstra di atas untuk judul grup
+               const maxX = Math.max(...xs) + 158 + PAD; // nodeWidth 158
+               const maxY = Math.max(...ys) + 145 + PAD; // nodeHeight 145
 
-      const xs = sibPositions.map(n => n.position.x);
-      const ys = sibPositions.map(n => n.position.y);
-      const minX = Math.min(...xs) - PAD;
-      const minY = Math.min(...ys) - PAD;
-      const maxX = Math.max(...xs) + 152 + PAD; // 152 = nodeWidth
-      const maxY = Math.max(...ys) + 145 + PAD; // 145 = nodeHeight
+               const hData = sortedMembers.find(m => m.id === hId);
+               const wData = sortedMembers.find(m => m.id === wId);
+               const firstNameH = hData?.name ? hData.name.split(' ')[0] : 'Seseorang';
+               const firstNameW = wData?.name ? wData.name.split(' ')[0] : 'Seseorang';
+               const title = `Kel. ${firstNameH} & ${firstNameW}`;
 
-      groupNodes.push({
-        id: `group-${groupKey}`,
-        type: 'familyGroup',
-        position: { x: minX, y: minY },
-        style: { width: maxX - minX, height: maxY - minY },
-        data: { fatherId: m.fatherId, motherId: m.motherId, count: siblings.length },
-        selectable: false,
-        draggable: false,
-        zIndex: -1,
-      });
+               groupNodes.push({
+                 id: `group-${groupKey}`,
+                 type: 'familyGroup',
+                 position: { x: minX, y: minY },
+                 style: { width: maxX - minX, height: maxY - minY },
+                 data: { label: title },
+                 selectable: false,
+                 draggable: false,
+                 zIndex: -1,
+               });
+            }
+        }
     });
 
     return { layoutedNodes: [...groupNodes, ...computedNodes], layoutedEdges: edges };
@@ -2333,6 +2275,22 @@ const App = () => {
 
         {/* Right: Actions */}
         <div className="navbar-actions">
+          {/* Messages */}
+          <div style={{ position: 'relative' }}>
+            <button className="navbar-icon-btn" title="Pesan Obrolan" onClick={() => { 
+              if (!planConfig.features.messaging) { openProModal('Fitur Chat & Pesan tersedia di paket Starter ke atas.'); return; }
+              setTargetChatId(null); setView('messages'); 
+            }}>
+              <MessageCircle size={16} />
+              {!planConfig.features.messaging && <Lock size={8} style={{ position: 'absolute', bottom: 2, right: 2, color: 'var(--primary)' }} />}
+              {unreadDmCount > 0 && planConfig.features.messaging && (
+                <span style={{ position: 'absolute', top: 1, right: 1, minWidth: 16, height: 16, borderRadius: 8, background: '#ef4444', border: '1.5px solid var(--bg-header)', color: 'white', fontSize: '0.6rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                  {unreadDmCount > 9 ? '9+' : unreadDmCount}
+                </span>
+              )}
+            </button>
+          </div>
+          
           {/* Notification Bell */}
           <div style={{ position: 'relative' }}>
             <button className="navbar-icon-btn" onClick={() => {
@@ -2355,9 +2313,20 @@ const App = () => {
                 <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: '0.85rem', borderBottom: '1px solid var(--border-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Notifikasi</span>
                   {notifications.length > 0 && <button onClick={() => {
-                    setNotifications([]);
-                    const fid = currentFamily?.id; const myId = user?.id || familyUser?.id;
-                    if (supabase && fid && myId) supabase.from('notifications').delete().eq('family_id', fid).eq('user_id', myId);
+                    const fid = currentFamily?.id; 
+                    const mId = user?.id || familyUser?.id;
+                    if (!supabase || !fid || !mId) return;
+                    
+                    setNotifications([]); // Optimistic clear
+                    supabase.from('notifications').delete()
+                      .eq('family_id', fid)
+                      .eq('user_id', mId)
+                      .then(({ error }) => {
+                        if (error) {
+                          console.error('Batal hapus notif:', error);
+                          // Optional: restore notifications or show toast
+                        }
+                      });
                   }} style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Hapus semua</button>}
                 </div>
                 <div style={{ maxHeight: 320, overflowY: 'auto' }}>
@@ -2372,7 +2341,7 @@ const App = () => {
                         {n.type === 'post' ? '📸' : n.type === 'like' ? '❤️' : n.type === 'reply' ? '↩️' : '💬'}
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.4 }}>{n.text}</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.4 }}>{n.message || n.text}</div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2 }}>
                           {new Date(n.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -2526,6 +2495,18 @@ const App = () => {
                 </Panel>
               </ReactFlow>
             </motion.div>
+          ) : view === 'messages' ? (
+            <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: '100%', height: '100%' }}>
+              <MessagesView 
+                currentFamily={currentFamily} 
+                familyMembers={familyMembers} 
+                user={user} 
+                familyUser={familyUser} 
+                userRole={userRole}
+                targetChatId={targetChatId}
+                onBack={() => { setTargetChatId(null); setView('tree'); }}
+              />
+            </motion.div>
           ) : view === 'gallery' ? (
             <GalleryView
               key="gallery"
@@ -2534,6 +2515,11 @@ const App = () => {
               loading={galleryLoading}
               currentUser={user ? { id: user.id, name: user.email?.split('@')[0], isAdmin: true } : familyUser ? { id: familyUser.id, name: familyUser.name, isAdmin: false } : null}
               canEdit={!!(user || familyUser)}
+              familyMembers={familyMembers}
+              onMemberClick={(id) => {
+                const m = familyMembers.find(fm => fm.id === id);
+                if (m) setViewTarget(m);
+              }}
             />
           ) : ((userRole === 'super_admin' || userRole === 'admin') && view === 'settings') ? (
             <motion.div key="settings" className="settings-wrap" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
@@ -2574,6 +2560,43 @@ const App = () => {
                            <img src={appConfig.logoUrl} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-card)' }} />
                         </div>
                     )}
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: '12px', display: 'block' }}>Tema Warna Aplikasi (Premium)</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px' }}>
+                      {[
+                        { id: 'classic',  name: 'Klasik',  color: '#d97706', desc: 'Amber Original' },
+                        { id: 'emerald',  name: 'Emerald', color: '#10b981', desc: 'Segar & Bersih' },
+                        { id: 'royal',    name: 'Royal',   color: '#6366f1', desc: 'Premium Blue' },
+                        { id: 'midnight', name: 'Midnight',color: '#0f172a', desc: 'UHD Dark Mode' },
+                        { id: 'sepia',    name: 'Vintage', color: '#92400e', desc: 'Warm Classic' },
+                      ].map(t => (
+                        <button 
+                          key={t.id}
+                          className={`glass ${appConfig.themeVariant === t.id ? 'active-theme' : ''}`}
+                          onClick={() => setAppConfig({ ...appConfig, themeVariant: t.id })}
+                          style={{ 
+                            padding: '12px', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: '6px', 
+                            alignItems: 'center', 
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            border: appConfig.themeVariant === t.id ? '2px solid var(--primary)' : '1px solid var(--border-card)',
+                            background: appConfig.themeVariant === t.id ? 'var(--primary-light)' : 'var(--bg-card)',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: t.color, border: '2px solid white', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }} />
+                          <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>{t.name}</div>
+                            <div style={{ fontSize: '0.6rem', opacity: 0.6 }}>{t.desc}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <hr style={{ borderColor: 'var(--border-card)', margin: '20px 0' }} />
@@ -3425,10 +3448,12 @@ const App = () => {
             : new Date().getFullYear() - birthYear
           : null;
         const gen = getGen(birthYear);
+        const nasabLabel = getNasabLabel(m, familyMembers);
         const rows = [
           m.birth && { icon: '🎂', label: 'Lahir', value: new Date(m.birth).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) },
           m.death && { icon: '🕊️', label: 'Wafat', value: new Date(m.death).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) },
           age !== null && { icon: '⏳', label: isDeceased ? 'Usia Wafat' : 'Usia', value: `${age} tahun` },
+          nasabLabel && { icon: '👨‍👩‍👧‍👦', label: 'Urutan Anak', value: nasabLabel },
           gen && { icon: '🌱', label: 'Generasi', value: gen },
           extractCity(m.address) && { icon: '📍', label: 'Kota', value: extractCity(m.address) },
           m.address && { icon: '🏠', label: 'Alamat', value: m.address },
@@ -3454,7 +3479,7 @@ const App = () => {
                     <div className={`fnc-dot ${isDeceased ? 'dead' : 'live'}`} style={{ bottom: 4, right: 4 }} />
                   </div>
                   <div className="vm-name">{m.name}</div>
-                  {m.nasabLabel && <div className="vm-sub">{m.nasabLabel}</div>}
+                  {nasabLabel && <div className="vm-sub">{nasabLabel}</div>}
                   <span className="vm-status-badge" style={{ background: isDeceased ? 'rgba(148,163,184,0.3)' : 'rgba(34,197,94,0.3)', color: 'white' }}>
                     {isDeceased ? (isMale ? 'Almarhum' : 'Almarhumah') : '✦ Masih Hidup'}
                   </span>
@@ -3478,6 +3503,15 @@ const App = () => {
 
                 {/* Footer */}
                 <div className="vm-footer">
+                  {((user || familyUser) && m.id !== (familyUser?.id || user?.id)) && (
+                    <button className="btn glass" style={{ flex: 1, justifyContent: 'center', color: 'var(--primary)', borderColor: 'var(--primary)', fontWeight: 600 }} 
+                      onClick={() => { 
+                        if (!planConfig.features.messaging) { openProModal('Fitur Chat & Pesan tersedia di paket Starter ke atas.'); return; }
+                        setTargetChatId(m.id); setViewTarget(null); setView('messages'); 
+                      }}>
+                      {planConfig.features.messaging ? '💬 Pesan' : '🔒 Pesan'}
+                    </button>
+                  )}
                   <button className="btn glass" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setViewTarget(null)}>
                     <X size={15} /> Tutup
                   </button>
@@ -4079,6 +4113,39 @@ const App = () => {
             <button className="btn btn-primary" style={{ width: '100%', marginTop: '25px', padding: '14px', justifyContent: 'center' }} onClick={() => setShowKinshipModal(false)}>
               Tutup Kalkulator
             </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Password Recovery Modal */}
+      {showRecoveryModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)', padding: '20px' }}>
+          <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass" style={{ width: '100%', maxWidth: '400px', padding: '32px', color: 'var(--text-main)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+              <div style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', color: 'white', width: '52px', height: '52px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 4px 14px rgba(217,119,6,0.35)' }}>
+                <Key size={24} />
+              </div>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '4px' }}>Reset Password</h2>
+              <p style={{ fontSize: '0.82rem', opacity: 0.6 }}>Masukkan password baru untuk akun Anda.</p>
+            </div>
+            <form onSubmit={handleRecoverySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="form-group">
+                <label className="form-label">Password Baru</label>
+                <input
+                  type="password"
+                  className="fi"
+                  value={recoveryPassword}
+                  onChange={e => setRecoveryPassword(e.target.value)}
+                  placeholder="Minimal 6 karakter"
+                  required
+                  minLength={6}
+                />
+              </div>
+              {recoveryError && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', textAlign: 'center', fontWeight: 600 }}>{recoveryError}</p>}
+              <button type="submit" disabled={recoveryLoading} className="btn btn-primary" style={{ padding: '13px', justifyContent: 'center', fontSize: '0.95rem', marginTop: '6px' }}>
+                {recoveryLoading ? 'Menyimpan...' : 'Simpan Password Baru'}
+              </button>
+            </form>
           </motion.div>
         </div>
       )}

@@ -14,6 +14,8 @@ export const PLANS = {
       importExcel: false,
       photoUpload: false,
       unlimitedTree: false,
+      messaging: false,
+      downloadImage: false,
     },
     featureList: [
       '✓ Hingga 15 anggota keluarga',
@@ -22,8 +24,9 @@ export const PLANS = {
       '✓ 5 slot login anggota',
       '✗ Kalkulator nasab',
       '✗ Klik ke Google Maps',
-      '✗ Export Excel',
+      '✗ Export Excel & Image',
       '✗ Upload foto',
+      '✗ Fitur Chat & Pesan',
     ],
   },
   starter: {
@@ -41,6 +44,8 @@ export const PLANS = {
       importExcel: false,
       photoUpload: true,
       unlimitedTree: false,
+      messaging: true,
+      downloadImage: true,
     },
     featureList: [
       '✓ Hingga 50 anggota keluarga',
@@ -49,8 +54,9 @@ export const PLANS = {
       '✓ 20 slot login anggota',
       '✓ Kalkulator nasab',
       '✓ Klik ke Google Maps',
-      '✓ Export Excel',
+      '✓ Export Excel & Image',
       '✓ Upload foto anggota',
+      '✓ Fitur Chat & Pesan',
     ],
   },
   family: {
@@ -68,6 +74,8 @@ export const PLANS = {
       importExcel: true,
       photoUpload: true,
       unlimitedTree: false,
+      messaging: true,
+      downloadImage: true,
     },
     featureList: [
       '✓ Hingga 100 anggota keluarga',
@@ -77,7 +85,9 @@ export const PLANS = {
       '✓ Kalkulator nasab',
       '✓ Klik ke Google Maps',
       '✓ Export & Import Excel',
+      '✓ Download Gambar Pohon',
       '✓ Upload foto anggota',
+      '✓ Fitur Chat & Pesan',
     ],
   },
   unlimited: {
@@ -95,6 +105,8 @@ export const PLANS = {
       importExcel: true,
       photoUpload: true,
       unlimitedTree: true,
+      messaging: true,
+      downloadImage: true,
     },
     featureList: [
       '✓ Anggota tak terbatas',
@@ -104,7 +116,9 @@ export const PLANS = {
       '✓ Kalkulator nasab',
       '✓ Klik ke Google Maps',
       '✓ Export & Import Excel',
+      '✓ Download Gambar Pohon',
       '✓ Upload foto anggota',
+      '✓ Fitur Chat & Pesan',
     ],
   },
 };
